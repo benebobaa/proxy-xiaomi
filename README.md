@@ -103,6 +103,8 @@ For cloud PAAS or container environments, you can manage everything without a co
 | `XIAOMI_PROXY_DOWNSTREAM_KEYS` | Comma-separated list of keys rotated when sending to Xiaomi. | None (Required) |
 | `TURSO_DATABASE_URL` | Turso remote URL (`libsql://...`) or path to a local SQLite file. | `local.db` |
 | `TURSO_AUTH_TOKEN` | Auth token for remote Turso DB. | Empty |
+| `XIAOMI_PROXY_ADMIN_USERNAME` | HTTP Basic Auth **username** for the `/admin/*` console. If unset, the admin console is unprotected. | Empty (unprotected) |
+| `XIAOMI_PROXY_ADMIN_PASSWORD` | HTTP Basic Auth **password** for the `/admin/*` console. Must be set together with the username. | Empty (unprotected) |
 
 ---
 
