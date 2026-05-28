@@ -1,6 +1,6 @@
 use tracing::info;
 
-use crate::storage::models::{UsageSummary, ClientKeyModel, DownstreamKeyModel};
+use crate::storage::models::{UsageSummary, ClientKeyModel, DownstreamKeyModel, RequestLog};
 use crate::storage::schema::SCHEMA;
 
 pub struct Db {
@@ -108,6 +108,68 @@ impl Db {
         Ok(summaries)
     }
 
+    /// Query raw individual request log entries (not aggregated).
+    pub async fn query_logs(
+        &self,
+        from: &str,
+        to: &str,
+        limit: i64,
+        offset: i64,
+        key: Option<&str>,
+        model: Option<&str>,
+    ) -> Result<Vec<RequestLog>, String> {
+        let mut sql = String::from(
+            "SELECT id, timestamp, client_key, protocol, path, model, \
+             status_code, latency_ms, prompt_tokens, completion_tokens, \
+             total_tokens, is_stream, error_message \
+             FROM request_logs WHERE date(timestamp) >= ?1 AND date(timestamp) <= ?2",
+        );
+        let mut params: Vec<libsql::Value> = vec![
+            libsql::Value::from(from.to_string()),
+            libsql::Value::from(to.to_string()),
+        ];
+
+        if let Some(k) = key {
+            sql.push_str(&format!(" AND client_key = ?{}", params.len() + 1));
+            params.push(libsql::Value::from(k.to_string()));
+        }
+        if let Some(m) = model {
+            sql.push_str(&format!(" AND model = ?{}", params.len() + 1));
+            params.push(libsql::Value::from(m.to_string()));
+        }
+
+        sql.push_str(&format!(
+            " ORDER BY timestamp DESC LIMIT ?{} OFFSET ?{}",
+            params.len() + 1,
+            params.len() + 2
+        ));
+        params.push(libsql::Value::from(limit));
+        params.push(libsql::Value::from(offset));
+
+        let stmt = self.conn.prepare(&sql).await.map_err(|e| e.to_string())?;
+        let mut rows = stmt.query(params).await.map_err(|e| e.to_string())?;
+
+        let mut logs = Vec::new();
+        while let Some(row) = rows.next().await.map_err(|e| e.to_string())? {
+            logs.push(RequestLog {
+                id: row.get::<String>(0).map_err(|e| e.to_string())?,
+                timestamp: row.get::<String>(1).map_err(|e| e.to_string())?,
+                client_key: row.get::<String>(2).map_err(|e| e.to_string())?,
+                protocol: row.get::<String>(3).map_err(|e| e.to_string())?,
+                path: row.get::<String>(4).map_err(|e| e.to_string())?,
+                model: row.get::<Option<String>>(5).map_err(|e| e.to_string())?,
+                status_code: row.get::<i64>(6).map_err(|e| e.to_string())? as u16,
+                latency_ms: row.get::<i64>(7).map_err(|e| e.to_string())? as u64,
+                prompt_tokens: row.get::<Option<i64>>(8).map_err(|e| e.to_string())?.map(|v| v as u32),
+                completion_tokens: row.get::<Option<i64>>(9).map_err(|e| e.to_string())?.map(|v| v as u32),
+                total_tokens: row.get::<Option<i64>>(10).map_err(|e| e.to_string())?.map(|v| v as u32),
+                is_stream: row.get::<i64>(11).map_err(|e| e.to_string())? != 0,
+                error_message: row.get::<Option<String>>(12).map_err(|e| e.to_string())?,
+            });
+        }
+        Ok(logs)
+    }
+
     pub async fn get_client_keys(&self) -> Result<Vec<ClientKeyModel>, String> {
         let stmt = self.conn.prepare("SELECT key, description, rate_limit, created_at FROM client_keys ORDER BY created_at DESC").await.map_err(|e| e.to_string())?;
         let mut rows = stmt.query(()).await.map_err(|e| e.to_string())?;
@@ -170,6 +232,18 @@ impl Db {
     pub async fn delete_downstream_key(&self, key: &str) -> Result<(), String> {
         self.conn
             .execute("DELETE FROM downstream_keys WHERE key = ?1", libsql::params![key.to_string()])
+            .await
+            .map(|_| ())
+            .map_err(|e| e.to_string())
+    }
+
+    /// Update the weight of an existing downstream key.
+    pub async fn update_downstream_key_weight(&self, key: &str, weight: i64) -> Result<(), String> {
+        self.conn
+            .execute(
+                "UPDATE downstream_keys SET weight = ?1 WHERE key = ?2",
+                libsql::params![weight, key.to_string()],
+            )
             .await
             .map(|_| ())
             .map_err(|e| e.to_string())

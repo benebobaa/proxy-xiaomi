@@ -3,38 +3,26 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Xiaomi Proxy Admin Gateway</title>
-  <!-- Google Fonts -->
+  <title>Xiaomi Proxy · Admin Console</title>
+  <meta name="description" content="Admin console for managing Xiaomi Proxy API keys, monitoring usage, and viewing request logs.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-  <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
-  <!-- Lucide Icons CDN -->
   <script src="https://unpkg.com/lucide@latest"></script>
-  <!-- Chart.js CDN -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script>
     tailwind.config = {
       darkMode: 'class',
       theme: {
         extend: {
-          fontFamily: {
-            sans: ['Inter', 'sans-serif'],
-          },
+          fontFamily: { sans: ['Inter', 'sans-serif'] },
           colors: {
             zinc: {
-              950: '#09090b',
-              900: '#18181b',
-              800: '#27272a',
-              700: '#3f3f46',
-              600: '#52525b',
-              500: '#71717a',
-              400: '#a1a1aa',
-              300: '#d4d4d8',
-              200: '#e4e4e7',
-              100: '#f4f4f5',
-              50: '#fafafa',
+              950: '#09090b', 900: '#18181b', 800: '#27272a',
+              700: '#3f3f46', 600: '#52525b', 500: '#71717a',
+              400: '#a1a1aa', 300: '#d4d4d8', 200: '#e4e4e7',
+              100: '#f4f4f5', 50:  '#fafafa',
             }
           }
         }
@@ -42,684 +30,782 @@
     }
   </script>
   <style>
-    body {
-      background-color: #09090b;
-      color: #fafafa;
-    }
-    .custom-scrollbar::-webkit-scrollbar {
-      width: 6px;
-      height: 6px;
-    }
-    .custom-scrollbar::-webkit-scrollbar-track {
-      background: #18181b;
-    }
-    .custom-scrollbar::-webkit-scrollbar-thumb {
-      background: #27272a;
-      border-radius: 3px;
-    }
-    .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-      background: #3f3f46;
-    }
+    body { background-color: #09090b; color: #fafafa; }
+    .custom-scrollbar::-webkit-scrollbar { width: 5px; height: 5px; }
+    .custom-scrollbar::-webkit-scrollbar-track { background: #18181b; }
+    .custom-scrollbar::-webkit-scrollbar-thumb { background: #3f3f46; border-radius: 3px; }
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #52525b; }
+    .nav-item { transition: all 0.15s ease; }
+    .nav-item.active { background: #27272a; color: #fff; }
+    .nav-item:not(.active):hover { background: #1c1c1f; color: #d4d4d8; }
+    .toast { transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1); }
+    .modal-backdrop { backdrop-filter: blur(4px); }
+    .key-badge { font-variant-ligatures: none; }
+    @keyframes pulse-dot { 0%,100%{opacity:1} 50%{opacity:.4} }
+    .pulse-dot { animation: pulse-dot 2s ease-in-out infinite; }
+    input[type="number"]::-webkit-inner-spin-button { opacity: 0.4; }
   </style>
 </head>
-<body class="min-h-screen font-sans flex flex-col antialiased selection:bg-zinc-800 selection:text-white">
+<body class="min-h-screen font-sans flex flex-col antialiased">
 
-  <!-- 1. Authentication Overlay -->
-  <div id="login-container" class="fixed inset-0 z-50 flex items-center justify-center bg-zinc-950 bg-opacity-95 px-4 hidden">
-    <div class="w-full max-w-md bg-zinc-900 border border-zinc-800 rounded-xl p-6 shadow-2xl space-y-6">
-      <div class="space-y-2 text-center">
-        <div class="inline-flex h-12 w-12 items-center justify-center rounded-lg bg-zinc-800 text-white mb-2">
-          <i data-lucide="shield-check" class="h-6 w-6"></i>
+  <!-- ─── Toast Container ──────────────────────────────────────────────────── -->
+  <div id="toast-container" class="fixed bottom-5 right-5 z-[200] flex flex-col-reverse gap-2 items-end pointer-events-none"></div>
+
+  <!-- ─── Key Created Modal ────────────────────────────────────────────────── -->
+  <div id="key-created-modal" class="fixed inset-0 z-[100] hidden items-center justify-center modal-backdrop bg-zinc-950/80 px-4">
+    <div class="w-full max-w-lg bg-zinc-900 border border-zinc-800 rounded-xl p-6 shadow-2xl space-y-5">
+      <div class="flex items-start justify-between">
+        <div class="flex items-center space-x-3">
+          <div class="h-9 w-9 flex items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-400">
+            <i data-lucide="key-round" class="h-4.5 w-4.5"></i>
+          </div>
+          <div>
+            <h3 class="text-base font-semibold text-white">Client Key Created</h3>
+            <p class="text-xs text-zinc-400 mt-0.5">Save this key — it won't be shown again in full.</p>
+          </div>
         </div>
-        <h1 class="text-2xl font-bold tracking-tight">Access Admin Console</h1>
-        <p class="text-sm text-zinc-400">Enter a valid Client API Key to authenticate and access metrics.</p>
-      </div>
-      <div class="space-y-4">
-        <div class="space-y-2">
-          <label for="admin-key-input" class="text-sm font-medium leading-none text-zinc-300">Admin Client Key</label>
-          <input type="password" id="admin-key-input" placeholder="sk-..." class="flex h-10 w-full rounded-md border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm text-white placeholder-zinc-600 focus:outline-none focus:ring-1 focus:ring-zinc-400 focus:border-transparent transition-all">
-        </div>
-        <button id="login-btn" class="inline-flex items-center justify-center rounded-md text-sm font-medium h-10 px-4 py-2 w-full bg-white text-zinc-950 hover:bg-zinc-200 transition-all font-semibold">
-          Authenticate
+        <button onclick="closeModal('key-created-modal')" class="text-zinc-500 hover:text-zinc-300 transition-colors">
+          <i data-lucide="x" class="h-5 w-5"></i>
         </button>
       </div>
-      <div id="login-error" class="hidden text-sm text-red-500 bg-red-950/30 border border-red-900/50 rounded-md p-3 text-center">
-        Authentication failed. Please verify your client key.
+      <div class="bg-zinc-950 border border-zinc-800 rounded-lg p-3 flex items-center justify-between gap-3">
+        <code id="created-key-value" class="text-emerald-400 text-sm font-mono break-all flex-1 select-all"></code>
+        <button id="copy-created-key-btn" onclick="copyCreatedKey()" class="flex-shrink-0 h-8 w-8 flex items-center justify-center rounded-md bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-white transition-all" title="Copy key">
+          <i data-lucide="copy" class="h-4 w-4"></i>
+        </button>
+      </div>
+      <div class="flex items-center gap-2 text-xs text-amber-400 bg-amber-500/5 border border-amber-500/15 rounded-lg px-3 py-2">
+        <i data-lucide="triangle-alert" class="h-3.5 w-3.5 flex-shrink-0"></i>
+        <span>Store this key securely. You cannot retrieve it again from the dashboard.</span>
+      </div>
+      <button onclick="closeModal('key-created-modal')" class="w-full py-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-sm font-medium text-zinc-200 transition-all">
+        Done, I've saved it
+      </button>
+    </div>
+  </div>
+
+  <!-- ─── Add Client Key Modal ──────────────────────────────────────────────── -->
+  <div id="add-client-key-modal" class="fixed inset-0 z-[100] hidden items-center justify-center modal-backdrop bg-zinc-950/80 px-4">
+    <div class="w-full max-w-md bg-zinc-900 border border-zinc-800 rounded-xl p-6 shadow-2xl space-y-4">
+      <div class="flex items-center justify-between">
+        <h3 class="text-base font-semibold text-white">Add Client Key</h3>
+        <button onclick="closeModal('add-client-key-modal')" class="text-zinc-500 hover:text-zinc-300">
+          <i data-lucide="x" class="h-5 w-5"></i>
+        </button>
+      </div>
+      <div class="space-y-3">
+        <div>
+          <label class="text-xs font-medium text-zinc-400 mb-1 block">Custom Key <span class="text-zinc-600">(leave blank to auto-generate)</span></label>
+          <input type="text" id="client-key-input" placeholder="sk-..." class="w-full h-9 rounded-md border border-zinc-800 bg-zinc-950 px-3 text-sm text-white placeholder-zinc-600 focus:outline-none focus:ring-1 focus:ring-zinc-500 transition-all">
+        </div>
+        <div>
+          <label class="text-xs font-medium text-zinc-400 mb-1 block">Description <span class="text-zinc-600">(optional)</span></label>
+          <input type="text" id="client-desc-input" placeholder="e.g. Production app" class="w-full h-9 rounded-md border border-zinc-800 bg-zinc-950 px-3 text-sm text-white placeholder-zinc-600 focus:outline-none focus:ring-1 focus:ring-zinc-500 transition-all">
+        </div>
+        <div>
+          <label class="text-xs font-medium text-zinc-400 mb-1 block">Rate Limit <span class="text-zinc-600">(req/min, optional)</span></label>
+          <input type="number" id="client-limit-input" placeholder="e.g. 60" min="1" class="w-full h-9 rounded-md border border-zinc-800 bg-zinc-950 px-3 text-sm text-white placeholder-zinc-600 focus:outline-none focus:ring-1 focus:ring-zinc-500 transition-all">
+        </div>
+      </div>
+      <div class="flex gap-2 pt-1">
+        <button onclick="closeModal('add-client-key-modal')" class="flex-1 py-2 rounded-lg border border-zinc-800 text-sm font-medium text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 transition-all">Cancel</button>
+        <button id="create-client-key-btn" class="flex-1 py-2 rounded-lg bg-white text-black text-sm font-medium hover:bg-zinc-200 transition-all">Generate Key</button>
       </div>
     </div>
   </div>
 
-  <!-- 2. Main Dashboard Layout -->
-  <div id="dashboard-container" class="flex flex-1 flex-col md:flex-row hidden">
-    
-    <!-- Sidebar Navigation -->
-    <aside class="w-full md:w-64 bg-zinc-900 border-b md:border-b-0 md:border-r border-zinc-800 flex flex-col">
-      <div class="p-6 border-b border-zinc-800 flex items-center justify-between">
-        <div class="flex items-center space-x-2.5">
-          <div class="h-8 w-8 rounded-lg bg-white text-zinc-950 flex items-center justify-center font-bold text-lg">M</div>
-          <span class="font-bold tracking-wide text-zinc-100">Xiaomi Mimo Proxy</span>
-        </div>
-        <span class="px-2 py-0.5 text-[10px] font-semibold bg-emerald-500/10 text-emerald-400 rounded-full border border-emerald-500/20">Active</span>
+  <!-- ─── Add Downstream Key Modal ─────────────────────────────────────────── -->
+  <div id="add-downstream-key-modal" class="fixed inset-0 z-[100] hidden items-center justify-center modal-backdrop bg-zinc-950/80 px-4">
+    <div class="w-full max-w-md bg-zinc-900 border border-zinc-800 rounded-xl p-6 shadow-2xl space-y-4">
+      <div class="flex items-center justify-between">
+        <h3 class="text-base font-semibold text-white">Add Downstream Key</h3>
+        <button onclick="closeModal('add-downstream-key-modal')" class="text-zinc-500 hover:text-zinc-300">
+          <i data-lucide="x" class="h-5 w-5"></i>
+        </button>
       </div>
-      
-      <!-- Nav Menu -->
-      <nav class="flex-1 p-4 space-y-1.5">
-        <button data-tab="overview" class="tab-btn flex items-center space-x-3 w-full px-3.5 py-2.5 text-sm font-medium rounded-lg bg-zinc-800 text-white transition-all">
-          <i data-lucide="layout-dashboard" class="h-4 w-4"></i>
+      <div class="space-y-3">
+        <div>
+          <label class="text-xs font-medium text-zinc-400 mb-1 block">API Key <span class="text-zinc-500">*</span></label>
+          <input type="text" id="downstream-key-input" placeholder="tp-..." class="w-full h-9 rounded-md border border-zinc-800 bg-zinc-950 px-3 text-sm text-white placeholder-zinc-600 focus:outline-none focus:ring-1 focus:ring-zinc-500 transition-all">
+        </div>
+        <div>
+          <label class="text-xs font-medium text-zinc-400 mb-1 block">Weight <span class="text-zinc-600">(higher = more traffic)</span></label>
+          <input type="number" id="downstream-weight-input" value="1" min="1" max="100" class="w-full h-9 rounded-md border border-zinc-800 bg-zinc-950 px-3 text-sm text-white focus:outline-none focus:ring-1 focus:ring-zinc-500 transition-all">
+        </div>
+      </div>
+      <div class="flex gap-2 pt-1">
+        <button onclick="closeModal('add-downstream-key-modal')" class="flex-1 py-2 rounded-lg border border-zinc-800 text-sm font-medium text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 transition-all">Cancel</button>
+        <button id="create-downstream-key-btn" class="flex-1 py-2 rounded-lg bg-white text-black text-sm font-medium hover:bg-zinc-200 transition-all">Add Key</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─── Confirm Delete Modal ──────────────────────────────────────────────── -->
+  <div id="confirm-modal" class="fixed inset-0 z-[100] hidden items-center justify-center modal-backdrop bg-zinc-950/80 px-4">
+    <div class="w-full max-w-sm bg-zinc-900 border border-zinc-800 rounded-xl p-6 shadow-2xl space-y-4">
+      <div class="flex items-center space-x-3">
+        <div class="h-9 w-9 flex items-center justify-center rounded-lg bg-red-500/10 text-red-400 flex-shrink-0">
+          <i data-lucide="trash-2" class="h-4 w-4"></i>
+        </div>
+        <div>
+          <h3 class="text-base font-semibold text-white">Confirm Action</h3>
+          <p id="confirm-message" class="text-xs text-zinc-400 mt-0.5">Are you sure?</p>
+        </div>
+      </div>
+      <div class="flex gap-2">
+        <button onclick="closeModal('confirm-modal')" class="flex-1 py-2 rounded-lg border border-zinc-800 text-sm font-medium text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 transition-all">Cancel</button>
+        <button id="confirm-action-btn" class="flex-1 py-2 rounded-lg bg-red-600 hover:bg-red-500 text-white text-sm font-medium transition-all">Delete</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─── Main Layout ───────────────────────────────────────────────────────── -->
+  <div class="flex flex-1 min-h-screen">
+
+    <!-- Sidebar -->
+    <aside class="w-56 flex-shrink-0 flex flex-col bg-zinc-950 border-r border-zinc-900 min-h-screen">
+      <!-- Logo -->
+      <div class="px-4 py-5 border-b border-zinc-900">
+        <div class="flex items-center space-x-2.5">
+          <div class="h-8 w-8 rounded-lg bg-white/5 border border-zinc-800 flex items-center justify-center">
+            <i data-lucide="shield" class="h-4 w-4 text-zinc-300"></i>
+          </div>
+          <div>
+            <div class="text-sm font-semibold text-white leading-tight">Xiaomi Proxy</div>
+            <div class="text-[10px] text-zinc-500 leading-tight">Admin Console</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Navigation -->
+      <nav class="flex-1 px-2 py-3 space-y-0.5">
+        <button onclick="switchTab('overview')" id="nav-overview" class="nav-item active w-full text-left flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium text-white">
+          <i data-lucide="layout-dashboard" class="h-4 w-4 flex-shrink-0"></i>
           <span>Overview</span>
         </button>
-        <button data-tab="client-keys" class="tab-btn flex items-center space-x-3 w-full px-3.5 py-2.5 text-sm font-medium rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-800/50 transition-all">
-          <i data-lucide="key" class="h-4 w-4"></i>
+        <button onclick="switchTab('client-keys')" id="nav-client-keys" class="nav-item w-full text-left flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium text-zinc-400">
+          <i data-lucide="users" class="h-4 w-4 flex-shrink-0"></i>
           <span>Client Keys</span>
         </button>
-        <button data-tab="downstream-keys" class="tab-btn flex items-center space-x-3 w-full px-3.5 py-2.5 text-sm font-medium rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-800/50 transition-all">
-          <i data-lucide="shuffle" class="h-4 w-4"></i>
+        <button onclick="switchTab('downstream-keys')" id="nav-downstream-keys" class="nav-item w-full text-left flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium text-zinc-400">
+          <i data-lucide="server" class="h-4 w-4 flex-shrink-0"></i>
           <span>Downstream Keys</span>
         </button>
-        <button data-tab="request-logs" class="tab-btn flex items-center space-x-3 w-full px-3.5 py-2.5 text-sm font-medium rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-800/50 transition-all">
-          <i data-lucide="terminal" class="h-4 w-4"></i>
+        <button onclick="switchTab('logs')" id="nav-logs" class="nav-item w-full text-left flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium text-zinc-400">
+          <i data-lucide="scroll-text" class="h-4 w-4 flex-shrink-0"></i>
           <span>Request Logs</span>
         </button>
       </nav>
 
-      <!-- Sidebar Footer / Logout -->
-      <div class="p-4 border-t border-zinc-800 space-y-3">
-        <div class="flex items-center space-x-2 px-3 py-1.5 rounded bg-zinc-950/50 border border-zinc-800/50">
-          <div class="h-2 w-2 rounded-full bg-emerald-500 animate-pulse"></div>
-          <span class="text-[11px] text-zinc-400 font-mono overflow-hidden text-ellipsis whitespace-nowrap" id="current-key-display">sk-...</span>
-        </div>
-        <button id="logout-btn" class="flex items-center space-x-2 text-xs text-zinc-400 hover:text-red-400 w-full px-3 py-1 text-left transition-all">
-          <i data-lucide="log-out" class="h-3.5 w-3.5"></i>
-          <span>Logout Console</span>
+      <!-- Footer -->
+      <div class="px-3 pb-4 space-y-1 border-t border-zinc-900 pt-3">
+        <a href="/health" target="_blank" class="nav-item flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium text-zinc-500 hover:text-zinc-300">
+          <i data-lucide="activity" class="h-4 w-4 flex-shrink-0"></i>
+          <span>Health Check</span>
+        </a>
+        <button onclick="handleLogout()" class="w-full nav-item flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium text-zinc-500 hover:text-red-400">
+          <i data-lucide="log-out" class="h-4 w-4 flex-shrink-0"></i>
+          <span>Sign out</span>
         </button>
       </div>
     </aside>
 
-    <!-- Main Content Area -->
-    <main class="flex-1 flex flex-col bg-zinc-950 p-6 md:p-8 space-y-8 overflow-y-auto custom-scrollbar">
-      
-      <!-- A. Overview Tab Content -->
-      <div id="tab-overview" class="tab-content space-y-8">
-        
-        <!-- Header -->
-        <div class="flex flex-col md:flex-row justify-between items-start md:items-center space-y-4 md:space-y-0">
+    <!-- Main Content -->
+    <main class="flex-1 overflow-auto custom-scrollbar bg-zinc-950">
+
+      <!-- ── Overview Tab ─────────────────────────────────────────────────── -->
+      <div id="tab-overview" class="tab-panel p-6 space-y-6">
+        <div class="flex items-center justify-between">
           <div>
-            <h2 class="text-2xl font-bold tracking-tight text-white">System Dashboard</h2>
-            <p class="text-sm text-zinc-400">Telemetry, request distributions, and pool load performance.</p>
+            <h1 class="text-xl font-bold text-white">Overview</h1>
+            <p class="text-xs text-zinc-500 mt-0.5">All-time usage and key health</p>
           </div>
-          <button id="refresh-overview-btn" class="inline-flex items-center space-x-1.5 rounded-lg border border-zinc-800 bg-zinc-900 hover:bg-zinc-800 px-3.5 py-2 text-sm text-zinc-200 transition-all">
-            <i data-lucide="rotate-cw" class="h-4 w-4"></i>
-            <span>Refresh Data</span>
-          </button>
-        </div>
-
-        <!-- Stat Cards -->
-        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <!-- Client Keys Card -->
-          <div class="rounded-xl border border-zinc-800 bg-zinc-900 p-6 shadow-sm">
-            <div class="flex items-center justify-between space-y-0 pb-2">
-              <span class="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Client API Keys</span>
-              <i data-lucide="key" class="h-4 w-4 text-zinc-400"></i>
-            </div>
-            <div class="text-2xl font-bold mt-1 text-white" id="stat-client-keys">0</div>
-            <p class="text-[10px] text-zinc-500 mt-1">Permitted clients configured</p>
-          </div>
-          <!-- Downstream Keys Card -->
-          <div class="rounded-xl border border-zinc-800 bg-zinc-900 p-6 shadow-sm">
-            <div class="flex items-center justify-between space-y-0 pb-2">
-              <span class="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Downstream Keys</span>
-              <i data-lucide="shuffle" class="h-4 w-4 text-zinc-400"></i>
-            </div>
-            <div class="text-2xl font-bold mt-1 text-white" id="stat-downstream-keys">0 / 0</div>
-            <p class="text-[10px] text-emerald-400 mt-1" id="stat-downstream-healthy">0 healthy in rotation</p>
-          </div>
-          <!-- Requests Card -->
-          <div class="rounded-xl border border-zinc-800 bg-zinc-900 p-6 shadow-sm">
-            <div class="flex items-center justify-between space-y-0 pb-2">
-              <span class="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Total Requests</span>
-              <i data-lucide="activity" class="h-4 w-4 text-zinc-400"></i>
-            </div>
-            <div class="text-2xl font-bold mt-1 text-white" id="stat-total-requests">0</div>
-            <p class="text-[10px] text-zinc-500 mt-1">Aggregated historical count</p>
-          </div>
-          <!-- Latency Card -->
-          <div class="rounded-xl border border-zinc-800 bg-zinc-900 p-6 shadow-sm">
-            <div class="flex items-center justify-between space-y-0 pb-2">
-              <span class="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Tokens Generated</span>
-              <i data-lucide="coins" class="h-4 w-4 text-zinc-400"></i>
-            </div>
-            <div class="text-2xl font-bold mt-1 text-white" id="stat-total-tokens">0</div>
-            <p class="text-[10px] text-zinc-500 mt-1" id="stat-token-details">0 prompt / 0 comp</p>
-          </div>
-        </div>
-
-        <!-- Charts Area -->
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <div class="rounded-xl border border-zinc-800 bg-zinc-900 p-5 space-y-4">
-            <h3 class="text-sm font-semibold text-zinc-300">Request Analytics (Last 30 Days)</h3>
-            <div class="h-64 relative flex items-center justify-center">
-              <canvas id="requests-chart"></canvas>
-            </div>
-          </div>
-          <div class="rounded-xl border border-zinc-800 bg-zinc-900 p-5 space-y-4">
-            <h3 class="text-sm font-semibold text-zinc-300">Token Consumption History</h3>
-            <div class="h-64 relative flex items-center justify-center">
-              <canvas id="tokens-chart"></canvas>
-            </div>
-          </div>
-        </div>
-
-      </div>
-
-      <!-- B. Client Keys Tab Content -->
-      <div id="tab-client-keys" class="tab-content space-y-6 hidden">
-        
-        <!-- Header -->
-        <div class="flex justify-between items-center">
-          <div>
-            <h2 class="text-2xl font-bold tracking-tight text-white">Client Keys</h2>
-            <p class="text-sm text-zinc-400">Manage client identities and credentials authorized to call the proxy.</p>
-          </div>
-          <button id="open-add-client-key-modal" class="inline-flex items-center space-x-2 rounded-lg bg-white hover:bg-zinc-200 px-4 py-2 text-sm text-zinc-950 font-semibold transition-all shadow">
-            <i data-lucide="plus" class="h-4 w-4"></i>
-            <span>Generate Client Key</span>
-          </button>
-        </div>
-
-        <!-- Table Card -->
-        <div class="rounded-xl border border-zinc-800 bg-zinc-900 overflow-hidden shadow-sm">
-          <div class="overflow-x-auto custom-scrollbar">
-            <table class="w-full text-left border-collapse text-sm">
-              <thead>
-                <tr class="border-b border-zinc-800 bg-zinc-900/50 text-zinc-400 font-medium">
-                  <th class="p-4">Masked Client Key</th>
-                  <th class="p-4">Description</th>
-                  <th class="p-4">Rate Limit</th>
-                  <th class="p-4">Created At</th>
-                  <th class="p-4 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody id="client-keys-table-body" class="divide-y divide-zinc-800">
-                <!-- Dynamically Populated -->
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-      </div>
-
-      <!-- C. Downstream Keys Tab Content -->
-      <div id="tab-downstream-keys" class="tab-content space-y-6 hidden">
-        
-        <!-- Header -->
-        <div class="flex justify-between items-center">
-          <div>
-            <h2 class="text-2xl font-bold tracking-tight text-white">Downstream Xiaomi Keys</h2>
-            <p class="text-sm text-zinc-400">Manage and rotate downstream API keys from Xiaomi Mimo Token Plan.</p>
-          </div>
-          <button id="open-add-downstream-key-modal" class="inline-flex items-center space-x-2 rounded-lg bg-white hover:bg-zinc-200 px-4 py-2 text-sm text-zinc-950 font-semibold transition-all shadow">
-            <i data-lucide="plus" class="h-4 w-4"></i>
-            <span>Add Downstream Key</span>
-          </button>
-        </div>
-
-        <!-- Table Card -->
-        <div class="rounded-xl border border-zinc-800 bg-zinc-900 overflow-hidden shadow-sm">
-          <div class="overflow-x-auto custom-scrollbar">
-            <table class="w-full text-left border-collapse text-sm">
-              <thead>
-                <tr class="border-b border-zinc-800 bg-zinc-900/50 text-zinc-400 font-medium">
-                  <th class="p-4">Downstream Key</th>
-                  <th class="p-4">Weight</th>
-                  <th class="p-4">Status</th>
-                  <th class="p-4">Total Requests</th>
-                  <th class="p-4">Consec. Errors</th>
-                  <th class="p-4 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody id="downstream-keys-table-body" class="divide-y divide-zinc-800">
-                <!-- Dynamically Populated -->
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-      </div>
-
-      <!-- D. Request Logs Tab Content -->
-      <div id="tab-request-logs" class="tab-content space-y-6 hidden">
-        
-        <!-- Header -->
-        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div>
-            <h2 class="text-2xl font-bold tracking-tight text-white">Request Telemetry Logs</h2>
-            <p class="text-sm text-zinc-400">Real-time audit trails of completions and API requests.</p>
-          </div>
-          
-          <div class="flex flex-wrap items-center gap-3">
-            <select id="log-filter-model" class="h-9 px-3 rounded-md border border-zinc-850 bg-zinc-900 text-xs text-zinc-300 focus:outline-none">
-              <option value="">All Models</option>
-              <option value="mimo-v2.5">mimo-v2.5</option>
-              <option value="mimo-v2-omni">mimo-v2-omni</option>
-            </select>
-            <input type="date" id="log-filter-date-from" class="h-9 px-3 rounded-md border border-zinc-850 bg-zinc-900 text-xs text-zinc-300 focus:outline-none">
-            <input type="date" id="log-filter-date-to" class="h-9 px-3 rounded-md border border-zinc-850 bg-zinc-900 text-xs text-zinc-300 focus:outline-none">
-            <button id="refresh-logs-btn" class="inline-flex h-9 items-center justify-center rounded-md border border-zinc-800 bg-zinc-900 px-3.5 text-xs font-medium text-zinc-200 hover:bg-zinc-800 transition-all">
-              <i data-lucide="search" class="h-3.5 w-3.5 mr-1.5"></i>
-              Filter
+          <div class="flex items-center gap-2">
+            <span id="auto-refresh-badge" class="hidden items-center gap-1.5 text-[10px] text-emerald-500 bg-emerald-500/10 border border-emerald-500/20 px-2 py-1 rounded-full">
+              <span class="pulse-dot h-1.5 w-1.5 rounded-full bg-emerald-500 inline-block"></span>
+              Live · refreshes every 30s
+            </span>
+            <span id="last-refresh-label" class="text-[10px] text-zinc-600"></span>
+            <button onclick="loadOverviewData()" id="refresh-overview-btn" class="h-8 px-3 flex items-center gap-1.5 rounded-md border border-zinc-800 bg-zinc-900 text-xs text-zinc-400 hover:text-white hover:bg-zinc-800 transition-all">
+              <i data-lucide="refresh-cw" class="h-3 w-3"></i> Refresh
             </button>
           </div>
         </div>
 
-        <!-- Table Card -->
-        <div class="rounded-xl border border-zinc-800 bg-zinc-900 overflow-hidden shadow-sm">
+        <!-- Stats Grid -->
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <div class="bg-zinc-900 border border-zinc-800 rounded-xl p-4 space-y-1">
+            <p class="text-xs text-zinc-500 font-medium">Total Requests</p>
+            <p id="stat-total-requests" class="text-2xl font-bold text-white">—</p>
+            <p id="stat-request-trend" class="text-[10px] text-zinc-600">All time</p>
+          </div>
+          <div class="bg-zinc-900 border border-zinc-800 rounded-xl p-4 space-y-1">
+            <p class="text-xs text-zinc-500 font-medium">Total Tokens</p>
+            <p id="stat-total-tokens" class="text-2xl font-bold text-white">—</p>
+            <p id="stat-token-details" class="text-[10px] text-zinc-600">—</p>
+          </div>
+          <div class="bg-zinc-900 border border-zinc-800 rounded-xl p-4 space-y-1">
+            <p class="text-xs text-zinc-500 font-medium">Client Keys</p>
+            <p id="stat-client-keys" class="text-2xl font-bold text-white">—</p>
+            <p class="text-[10px] text-zinc-600">Active credentials</p>
+          </div>
+          <div class="bg-zinc-900 border border-zinc-800 rounded-xl p-4 space-y-1">
+            <p class="text-xs text-zinc-500 font-medium">Downstream Health</p>
+            <p id="stat-downstream-keys" class="text-2xl font-bold text-white">—</p>
+            <p id="stat-downstream-healthy" class="text-[10px] text-zinc-600">—</p>
+          </div>
+        </div>
+
+        <!-- Charts -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <div class="bg-zinc-900 border border-zinc-800 rounded-xl p-5">
+            <div class="flex items-center justify-between mb-4">
+              <p class="text-sm font-semibold text-white">Daily Requests</p>
+              <span class="text-[10px] text-zinc-500 bg-zinc-800 px-2 py-0.5 rounded">Last 30 days</span>
+            </div>
+            <div id="chart-requests-empty" class="hidden py-12 text-center text-zinc-600 text-xs">No requests recorded yet</div>
+            <canvas id="chart-requests" height="180"></canvas>
+          </div>
+          <div class="bg-zinc-900 border border-zinc-800 rounded-xl p-5">
+            <div class="flex items-center justify-between mb-4">
+              <p class="text-sm font-semibold text-white">Daily Token Usage</p>
+              <span class="text-[10px] text-zinc-500 bg-zinc-800 px-2 py-0.5 rounded">Prompt vs Completion</span>
+            </div>
+            <div id="chart-tokens-empty" class="hidden py-12 text-center text-zinc-600 text-xs">No tokens recorded yet</div>
+            <canvas id="chart-tokens" height="180"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Client Keys Tab ─────────────────────────────────────────────── -->
+      <div id="tab-client-keys" class="tab-panel hidden p-6 space-y-5">
+        <div class="flex items-center justify-between">
+          <div>
+            <h1 class="text-xl font-bold text-white">Client Keys</h1>
+            <p class="text-xs text-zinc-500 mt-0.5">Bearer tokens used to authenticate upstream callers</p>
+          </div>
+          <button onclick="openModal('add-client-key-modal')" id="open-add-client-key-modal" class="h-9 px-4 flex items-center gap-2 rounded-lg bg-white text-black text-sm font-medium hover:bg-zinc-200 transition-all">
+            <i data-lucide="plus" class="h-4 w-4"></i> Add Key
+          </button>
+        </div>
+        <div class="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
           <div class="overflow-x-auto custom-scrollbar">
-            <table class="w-full text-left border-collapse text-xs">
+            <table class="w-full text-sm">
               <thead>
-                <tr class="border-b border-zinc-800 bg-zinc-900/50 text-zinc-400 font-medium">
-                  <th class="p-3.5">Timestamp</th>
-                  <th class="p-3.5">Client Key</th>
-                  <th class="p-3.5">Protocol</th>
-                  <th class="p-3.5">Path</th>
-                  <th class="p-3.5">Model</th>
-                  <th class="p-3.5">Status</th>
-                  <th class="p-3.5">Latency</th>
-                  <th class="p-3.5">Tokens (P / C / T)</th>
+                <tr class="border-b border-zinc-800">
+                  <th class="p-4 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">Key</th>
+                  <th class="p-4 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">Description</th>
+                  <th class="p-4 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">Rate Limit</th>
+                  <th class="p-4 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">Created</th>
+                  <th class="p-4 text-right text-xs font-medium text-zinc-500 uppercase tracking-wider">Actions</th>
                 </tr>
               </thead>
-              <tbody id="logs-table-body" class="divide-y divide-zinc-800">
-                <!-- Dynamically Populated -->
+              <tbody id="client-keys-table-body">
+                <tr><td colspan="5" class="p-8 text-center text-zinc-600 text-xs">Loading…</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Downstream Keys Tab ──────────────────────────────────────────── -->
+      <div id="tab-downstream-keys" class="tab-panel hidden p-6 space-y-5">
+        <div class="flex items-center justify-between">
+          <div>
+            <h1 class="text-xl font-bold text-white">Downstream Keys</h1>
+            <p class="text-xs text-zinc-500 mt-0.5">Rotating pool of Xiaomi API keys with weighted load balancing</p>
+          </div>
+          <button onclick="openModal('add-downstream-key-modal')" id="open-add-downstream-key-modal" class="h-9 px-4 flex items-center gap-2 rounded-lg bg-white text-black text-sm font-medium hover:bg-zinc-200 transition-all">
+            <i data-lucide="plus" class="h-4 w-4"></i> Add Key
+          </button>
+        </div>
+        <div class="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
+          <div class="overflow-x-auto custom-scrollbar">
+            <table class="w-full text-sm">
+              <thead>
+                <tr class="border-b border-zinc-800">
+                  <th class="p-4 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">Key</th>
+                  <th class="p-4 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">Weight</th>
+                  <th class="p-4 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">Status</th>
+                  <th class="p-4 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">Requests</th>
+                  <th class="p-4 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">Errors</th>
+                  <th class="p-4 text-right text-xs font-medium text-zinc-500 uppercase tracking-wider">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="downstream-keys-table-body">
+                <tr><td colspan="6" class="p-8 text-center text-zinc-600 text-xs">Loading…</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Request Logs Tab ──────────────────────────────────────────────── -->
+      <div id="tab-logs" class="tab-panel hidden p-6 space-y-5">
+        <div class="flex items-center justify-between">
+          <div>
+            <h1 class="text-xl font-bold text-white">Request Logs</h1>
+            <p class="text-xs text-zinc-500 mt-0.5">Raw request history with status, latency, and token details</p>
+          </div>
+          <button onclick="loadRequestLogs()" id="refresh-logs-btn" class="h-8 px-3 flex items-center gap-1.5 rounded-md border border-zinc-800 bg-zinc-900 text-xs text-zinc-400 hover:text-white hover:bg-zinc-800 transition-all">
+            <i data-lucide="refresh-cw" class="h-3 w-3"></i> Refresh
+          </button>
+        </div>
+
+        <!-- Filters -->
+        <div class="flex flex-wrap gap-2 items-end">
+          <div>
+            <label class="text-[10px] text-zinc-500 mb-1 block">From</label>
+            <input type="date" id="log-filter-date-from" class="h-8 px-2.5 rounded-md border border-zinc-800 bg-zinc-900 text-xs text-zinc-300 focus:outline-none focus:ring-1 focus:ring-zinc-600 transition-all">
+          </div>
+          <div>
+            <label class="text-[10px] text-zinc-500 mb-1 block">To</label>
+            <input type="date" id="log-filter-date-to" class="h-8 px-2.5 rounded-md border border-zinc-800 bg-zinc-900 text-xs text-zinc-300 focus:outline-none focus:ring-1 focus:ring-zinc-600 transition-all">
+          </div>
+          <div>
+            <label class="text-[10px] text-zinc-500 mb-1 block">Model</label>
+            <input type="text" id="log-filter-model" placeholder="e.g. gpt-4o" class="h-8 px-2.5 rounded-md border border-zinc-800 bg-zinc-900 text-xs text-zinc-300 placeholder-zinc-700 focus:outline-none focus:ring-1 focus:ring-zinc-600 transition-all w-36">
+          </div>
+          <div>
+            <label class="text-[10px] text-zinc-500 mb-1 block">Client Key</label>
+            <input type="text" id="log-filter-key" placeholder="sk-..." class="h-8 px-2.5 rounded-md border border-zinc-800 bg-zinc-900 text-xs text-zinc-300 placeholder-zinc-700 focus:outline-none focus:ring-1 focus:ring-zinc-600 transition-all w-36">
+          </div>
+          <button onclick="loadRequestLogs()" class="h-8 px-3 rounded-md bg-zinc-800 hover:bg-zinc-700 text-xs font-medium text-zinc-300 hover:text-white transition-all">
+            Apply Filters
+          </button>
+          <button onclick="clearLogFilters()" class="h-8 px-3 rounded-md border border-zinc-800 text-xs text-zinc-500 hover:text-zinc-300 transition-all">
+            Clear
+          </button>
+        </div>
+
+        <div class="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
+          <div class="overflow-x-auto custom-scrollbar">
+            <table class="w-full text-xs">
+              <thead>
+                <tr class="border-b border-zinc-800">
+                  <th class="p-3.5 text-left font-medium text-zinc-500 uppercase tracking-wider whitespace-nowrap">Timestamp</th>
+                  <th class="p-3.5 text-left font-medium text-zinc-500 uppercase tracking-wider">Client Key</th>
+                  <th class="p-3.5 text-left font-medium text-zinc-500 uppercase tracking-wider">Protocol</th>
+                  <th class="p-3.5 text-left font-medium text-zinc-500 uppercase tracking-wider">Path</th>
+                  <th class="p-3.5 text-left font-medium text-zinc-500 uppercase tracking-wider">Model</th>
+                  <th class="p-3.5 text-left font-medium text-zinc-500 uppercase tracking-wider">Status</th>
+                  <th class="p-3.5 text-left font-medium text-zinc-500 uppercase tracking-wider">Latency</th>
+                  <th class="p-3.5 text-left font-medium text-zinc-500 uppercase tracking-wider">Tokens P/C/T</th>
+                  <th class="p-3.5 text-left font-medium text-zinc-500 uppercase tracking-wider">Stream</th>
+                </tr>
+              </thead>
+              <tbody id="logs-table-body">
+                <tr><td colspan="9" class="p-8 text-center text-zinc-600">Loading…</td></tr>
               </tbody>
             </table>
           </div>
         </div>
 
+        <!-- Load More -->
+        <div class="flex justify-center">
+          <button id="load-more-btn" onclick="loadMoreLogs()" class="hidden h-8 px-5 rounded-lg border border-zinc-800 text-xs font-medium text-zinc-400 hover:text-white hover:bg-zinc-800 transition-all">
+            Load more
+          </button>
+        </div>
       </div>
 
     </main>
   </div>
 
-  <!-- 3. Add Client Key Modal -->
-  <div id="add-client-key-modal" class="fixed inset-0 z-50 flex items-center justify-center bg-zinc-950/80 px-4 hidden">
-    <div class="w-full max-w-md bg-zinc-900 border border-zinc-800 rounded-xl p-6 shadow-2xl space-y-6">
-      <div class="flex justify-between items-start">
-        <h3 class="text-lg font-bold text-white">Generate Client Key</h3>
-        <button class="close-modal text-zinc-400 hover:text-white"><i data-lucide="x" class="h-5 w-5"></i></button>
-      </div>
-      
-      <div class="space-y-4">
-        <div class="space-y-2">
-          <label class="text-sm font-medium text-zinc-300">Custom Key (Leave blank to generate random key)</label>
-          <input type="text" id="client-key-input" placeholder="sk-..." class="flex h-10 w-full rounded-md border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm text-white focus:outline-none focus:ring-1 focus:ring-zinc-400 transition-all">
-        </div>
-        <div class="space-y-2">
-          <label class="text-sm font-medium text-zinc-300">Description</label>
-          <input type="text" id="client-desc-input" placeholder="e.g. Developer environment" class="flex h-10 w-full rounded-md border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm text-white focus:outline-none focus:ring-1 focus:ring-zinc-400 transition-all">
-        </div>
-        <div class="space-y-2">
-          <label class="text-sm font-medium text-zinc-300">Rate Limit (Requests per minute, blank = default)</label>
-          <input type="number" id="client-limit-input" placeholder="60" class="flex h-10 w-full rounded-md border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm text-white focus:outline-none focus:ring-1 focus:ring-zinc-400 transition-all">
-        </div>
-        
-        <button id="create-client-key-btn" class="inline-flex items-center justify-center rounded-md text-sm font-semibold h-10 px-4 py-2 w-full bg-white text-zinc-950 hover:bg-zinc-200 transition-all">
-          Create Key
-        </button>
-      </div>
-    </div>
-  </div>
-
-  <!-- 4. Add Downstream Key Modal -->
-  <div id="add-downstream-key-modal" class="fixed inset-0 z-50 flex items-center justify-center bg-zinc-950/80 px-4 hidden">
-    <div class="w-full max-w-md bg-zinc-900 border border-zinc-800 rounded-xl p-6 shadow-2xl space-y-6">
-      <div class="flex justify-between items-start">
-        <h3 class="text-lg font-bold text-white">Add Downstream Key</h3>
-        <button class="close-modal text-zinc-400 hover:text-white"><i data-lucide="x" class="h-5 w-5"></i></button>
-      </div>
-      
-      <div class="space-y-4">
-        <div class="space-y-2">
-          <label class="text-sm font-medium text-zinc-300">Xiaomi Token Plan API Key</label>
-          <input type="text" id="downstream-key-input" placeholder="tp-..." class="flex h-10 w-full rounded-md border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm text-white focus:outline-none focus:ring-1 focus:ring-zinc-400 transition-all">
-        </div>
-        <div class="space-y-2">
-          <label class="text-sm font-medium text-zinc-300">Key Weight (Load-Balancing priority)</label>
-          <input type="number" id="downstream-weight-input" value="1" min="1" class="flex h-10 w-full rounded-md border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm text-white focus:outline-none focus:ring-1 focus:ring-zinc-400 transition-all">
-        </div>
-        
-        <button id="create-downstream-key-btn" class="inline-flex items-center justify-center rounded-md text-sm font-semibold h-10 px-4 py-2 w-full bg-white text-zinc-950 hover:bg-zinc-200 transition-all">
-          Add Key
-        </button>
-      </div>
-    </div>
-  </div>
-
   <script>
-    // --- Application State ---
-    let clientKey = localStorage.getItem('xiaomi_proxy_admin_key') || '';
+    // ─── State ────────────────────────────────────────────────────────────────
     let activeTab = 'overview';
-    let requestsChartInstance = null;
-    let tokensChartInstance = null;
+    let autoRefreshInterval = null;
+    let confirmCallback = null;
+    let requestChartInstance = null;
+    let tokenChartInstance = null;
+    let logsOffset = 0;
+    const LOGS_PAGE_SIZE = 100;
 
-    // --- Helper UI Initializer ---
-    function initializeIcons() {
-      lucide.createIcons();
-    }
-
-    // --- Tab Switcher Logic ---
-    const tabButtons = document.querySelectorAll('.tab-btn');
-    const tabContents = document.querySelectorAll('.tab-content');
-
-    tabButtons.forEach(btn => {
-      btn.addEventListener('click', () => {
-        const tab = btn.getAttribute('data-tab');
-        switchTab(tab);
-      });
-    });
-
-    function switchTab(tab) {
-      activeTab = tab;
-      
-      tabButtons.forEach(btn => {
-        if (btn.getAttribute('data-tab') === tab) {
-          btn.classList.add('bg-zinc-800', 'text-white');
-          btn.classList.remove('text-zinc-400', 'hover:bg-zinc-800/50');
-        } else {
-          btn.classList.remove('bg-zinc-800', 'text-white');
-          btn.classList.add('text-zinc-400', 'hover:bg-zinc-800/50');
-        }
-      });
-
-      tabContents.forEach(content => {
-        if (content.id === `tab-${tab}`) {
-          content.classList.remove('hidden');
-        } else {
-          content.classList.add('hidden');
-        }
-      });
-
-      // Load specific tab data
-      if (tab === 'overview') {
-        loadOverviewData();
-      } else if (tab === 'client-keys') {
-        loadClientKeys();
-      } else if (tab === 'downstream-keys') {
-        loadDownstreamKeys();
-      } else if (tab === 'request-logs') {
-        loadRequestLogs();
-      }
-    }
-
-    // --- Network API Requests ---
+    // ─── Core API Fetch ───────────────────────────────────────────────────────
+    // Basic Auth is handled by the browser automatically after the first
+    // native credential challenge. We simply fetch without any special header.
     async function apiFetch(endpoint, options = {}) {
-      if (!clientKey) {
-        showLogin();
-        throw new Error('Unauthenticated');
-      }
-
       const url = `${window.location.origin}${endpoint}`;
-      const headers = {
-        'Authorization': `Bearer ${clientKey}`,
-        'Content-Type': 'application/json',
-        ...options.headers
-      };
-
+      const headers = { 'Content-Type': 'application/json', ...options.headers };
       try {
         const response = await fetch(url, { ...options, headers });
         if (response.status === 401) {
-          localStorage.removeItem('xiaomi_proxy_admin_key');
-          clientKey = '';
-          showLogin();
+          // Credentials expired — reload to trigger browser Basic Auth dialog
+          location.reload();
           throw new Error('Unauthorized');
         }
         if (!response.ok) {
           const body = await response.text();
-          throw new Error(body || 'Server returned non-ok status');
+          throw new Error(body || `HTTP ${response.status}`);
         }
         return await response.json();
       } catch (err) {
-        console.error(`API Error on ${endpoint}:`, err);
+        console.error(`API Error (${endpoint}):`, err);
         throw err;
       }
     }
 
-    // --- Authentication ---
-    function showLogin() {
-      document.getElementById('login-container').classList.remove('hidden');
-      document.getElementById('dashboard-container').classList.add('hidden');
+    // ─── Toast System ─────────────────────────────────────────────────────────
+    function showToast(message, type = 'success') {
+      const container = document.getElementById('toast-container');
+      const icons = { success: 'check-circle', error: 'x-circle', info: 'info' };
+      const colors = {
+        success: 'bg-zinc-900 border-zinc-700 text-zinc-100',
+        error:   'bg-red-950/90 border-red-800/60 text-red-200',
+        info:    'bg-zinc-900 border-zinc-700 text-zinc-300',
+      };
+      const iconColors = { success: 'text-emerald-400', error: 'text-red-400', info: 'text-blue-400' };
+
+      const toast = document.createElement('div');
+      toast.className = `toast pointer-events-auto flex items-center gap-3 px-4 py-3 rounded-xl border shadow-2xl text-sm max-w-xs translate-y-2 opacity-0 ${colors[type]}`;
+      toast.innerHTML = `
+        <i data-lucide="${icons[type]}" class="h-4 w-4 flex-shrink-0 ${iconColors[type]}"></i>
+        <span class="flex-1">${message}</span>
+      `;
+      container.appendChild(toast);
+      lucide.createIcons({ nodes: [toast] });
+
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        toast.classList.remove('translate-y-2', 'opacity-0');
+      }));
+
+      setTimeout(() => {
+        toast.classList.add('translate-y-2', 'opacity-0');
+        setTimeout(() => toast.remove(), 300);
+      }, 3500);
     }
 
-    function hideLogin() {
-      document.getElementById('login-container').classList.add('hidden');
-      document.getElementById('dashboard-container').classList.remove('hidden');
-      document.getElementById('current-key-display').innerText = maskKey(clientKey);
-      switchTab(activeTab);
-    }
-
-    async function attemptAuth() {
-      const inputVal = document.getElementById('admin-key-input').value.trim();
-      if (!inputVal) return;
-
-      document.getElementById('login-btn').innerText = 'Authenticating...';
-      document.getElementById('login-error').classList.add('hidden');
-
+    // ─── Clipboard ───────────────────────────────────────────────────────────
+    async function copyText(text, btnEl) {
       try {
-        // Validate by hitting the health check endpoint
-        const response = await fetch(`${window.location.origin}/health`, {
-          headers: { 'Authorization': `Bearer ${inputVal}` }
-        });
-
-        if (response.ok) {
-          clientKey = inputVal;
-          localStorage.setItem('xiaomi_proxy_admin_key', clientKey);
-          hideLogin();
-        } else {
-          document.getElementById('login-error').classList.remove('hidden');
+        await navigator.clipboard.writeText(text);
+        showToast('Copied to clipboard');
+        if (btnEl) {
+          const orig = btnEl.innerHTML;
+          btnEl.innerHTML = `<i data-lucide="check" class="h-3.5 w-3.5 text-emerald-400"></i>`;
+          lucide.createIcons({ nodes: [btnEl] });
+          setTimeout(() => { btnEl.innerHTML = orig; lucide.createIcons({ nodes: [btnEl] }); }, 1500);
         }
-      } catch (err) {
-        document.getElementById('login-error').classList.remove('hidden');
-      } finally {
-        document.getElementById('login-btn').innerText = 'Authenticate';
-      }
+      } catch { showToast('Copy failed', 'error'); }
     }
 
-    document.getElementById('login-btn').addEventListener('click', attemptAuth);
-    document.getElementById('admin-key-input').addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') attemptAuth();
+    function copyCreatedKey() {
+      const key = document.getElementById('created-key-value').textContent;
+      copyText(key, document.getElementById('copy-created-key-btn'));
+    }
+
+    // ─── Modal Helpers ───────────────────────────────────────────────────────
+    function openModal(id) {
+      const el = document.getElementById(id);
+      el.classList.remove('hidden');
+      el.classList.add('flex');
+    }
+    function closeModal(id) {
+      const el = document.getElementById(id);
+      el.classList.add('hidden');
+      el.classList.remove('flex');
+    }
+    function showConfirm(message, callback, btnLabel = 'Delete') {
+      document.getElementById('confirm-message').textContent = message;
+      document.getElementById('confirm-action-btn').textContent = btnLabel;
+      confirmCallback = callback;
+      openModal('confirm-modal');
+    }
+    document.getElementById('confirm-action-btn').addEventListener('click', () => {
+      closeModal('confirm-modal');
+      if (confirmCallback) confirmCallback();
+    });
+    // Close modals on backdrop click
+    document.querySelectorAll('[id$="-modal"]').forEach(modal => {
+      modal.addEventListener('click', e => {
+        if (e.target === modal) closeModal(modal.id);
+      });
     });
 
-    document.getElementById('logout-btn').addEventListener('click', () => {
-      localStorage.removeItem('xiaomi_proxy_admin_key');
-      clientKey = '';
-      showLogin();
-    });
-
-    // --- Helper Formats ---
+    // ─── Utility Formatters ──────────────────────────────────────────────────
     function maskKey(key) {
-      if (key.length <= 8) return '***';
-      return `${key.slice(0, 4)}...${key.slice(-4)}`;
+      if (!key || key.length <= 8) return '***';
+      return `${key.slice(0, 6)}…${key.slice(-4)}`;
     }
 
-    // --- Tab Data Loaders ---
-    
-    // Overview Data
+    function formatTimestamp(ts) {
+      if (!ts) return '—';
+      try {
+        const d = new Date(ts.endsWith('Z') ? ts : ts + 'Z');
+        return d.toLocaleString(undefined, {
+          month: 'short', day: 'numeric',
+          hour: '2-digit', minute: '2-digit', second: '2-digit',
+          hour12: false
+        });
+      } catch { return ts; }
+    }
+
+    function formatDate(ts) {
+      if (!ts) return '—';
+      try {
+        const d = new Date(ts.endsWith('Z') ? ts : ts + 'Z');
+        return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+      } catch { return ts; }
+    }
+
+    function statusBadge(code) {
+      if (code >= 200 && code < 300)
+        return `<span class="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">${code}</span>`;
+      if (code >= 400 && code < 500)
+        return `<span class="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/20">${code}</span>`;
+      return `<span class="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-red-500/10 text-red-400 border border-red-500/20">${code}</span>`;
+    }
+
+    // ─── Tab Management ──────────────────────────────────────────────────────
+    const TAB_LOADERS = {
+      'overview':        loadOverviewData,
+      'client-keys':     loadClientKeys,
+      'downstream-keys': loadDownstreamKeys,
+      'logs':            loadRequestLogs,
+    };
+
+    function switchTab(tab) {
+      activeTab = tab;
+      document.querySelectorAll('.tab-panel').forEach(p => p.classList.add('hidden'));
+      document.querySelectorAll('.nav-item').forEach(n => {
+        n.classList.remove('active', 'text-white');
+        n.classList.add('text-zinc-400');
+      });
+      document.getElementById(`tab-${tab}`).classList.remove('hidden');
+      const navEl = document.getElementById(`nav-${tab}`);
+      navEl.classList.add('active', 'text-white');
+      navEl.classList.remove('text-zinc-400');
+
+      if (tab === 'overview') startAutoRefresh();
+      else stopAutoRefresh();
+
+      TAB_LOADERS[tab]?.();
+    }
+
+    // ─── Auto-Refresh ────────────────────────────────────────────────────────
+    function startAutoRefresh() {
+      stopAutoRefresh();
+      document.getElementById('auto-refresh-badge').classList.remove('hidden');
+      document.getElementById('auto-refresh-badge').classList.add('flex');
+      autoRefreshInterval = setInterval(() => {
+        if (activeTab === 'overview') loadOverviewData();
+      }, 30000);
+    }
+    function stopAutoRefresh() {
+      if (autoRefreshInterval) { clearInterval(autoRefreshInterval); autoRefreshInterval = null; }
+      document.getElementById('auto-refresh-badge').classList.add('hidden');
+      document.getElementById('auto-refresh-badge').classList.remove('flex');
+    }
+
+    // ─── Overview Data ───────────────────────────────────────────────────────
     async function loadOverviewData() {
       try {
-        const usageData = await apiFetch('/admin/usage');
-        const keysData = await apiFetch('/admin/keys');
-        const clientKeysData = await apiFetch('/admin/client-keys');
+        const [usageData, keysData, clientKeysData] = await Promise.all([
+          apiFetch('/admin/usage'),
+          apiFetch('/admin/keys'),
+          apiFetch('/admin/client-keys'),
+        ]);
 
-        // Render counters
-        document.getElementById('stat-client-keys').innerText = clientKeysData.length;
-        document.getElementById('stat-downstream-keys').innerText = `${keysData.healthy} / ${keysData.total}`;
-        document.getElementById('stat-downstream-healthy').innerText = `${keysData.healthy} healthy, ${keysData.total - keysData.healthy} cooled down`;
-
-        let totalRequests = 0;
-        let totalTokens = 0;
-        let totalPromptTokens = 0;
-        let totalCompletionTokens = 0;
+        document.getElementById('stat-client-keys').textContent = clientKeysData.length;
+        document.getElementById('stat-downstream-keys').textContent =
+          `${keysData.healthy} / ${keysData.total}`;
+        document.getElementById('stat-downstream-healthy').textContent =
+          `${keysData.healthy} healthy · ${keysData.total - keysData.healthy} cooling`;
 
         const records = usageData.records || [];
+        let totalRequests = 0, totalTokens = 0, totalPrompt = 0, totalCompletion = 0;
         records.forEach(r => {
           totalRequests += r.request_count;
           totalTokens += r.total_tokens;
-          totalPromptTokens += r.total_prompt_tokens;
-          totalCompletionTokens += r.total_completion_tokens;
+          totalPrompt += r.total_prompt_tokens;
+          totalCompletion += r.total_completion_tokens;
         });
 
-        document.getElementById('stat-total-requests').innerText = totalRequests.toLocaleString();
-        document.getElementById('stat-total-tokens').innerText = totalTokens.toLocaleString();
-        document.getElementById('stat-token-details').innerText = `${totalPromptTokens.toLocaleString()} prompt / ${totalCompletionTokens.toLocaleString()} comp`;
+        document.getElementById('stat-total-requests').textContent = totalRequests.toLocaleString();
+        document.getElementById('stat-total-tokens').textContent = totalTokens.toLocaleString();
+        document.getElementById('stat-token-details').textContent =
+          `${totalPrompt.toLocaleString()} prompt / ${totalCompletion.toLocaleString()} compl.`;
 
-        // Render Charts
         renderOverviewCharts(records);
 
+        const now = new Date();
+        document.getElementById('last-refresh-label').textContent =
+          `Last: ${now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}`;
       } catch (err) {
-        console.error('Failed to load overview data', err);
+        showToast('Failed to load overview data', 'error');
       }
     }
 
     function renderOverviewCharts(records) {
-      // Group records by date
       const dateMap = {};
-      
       records.forEach(r => {
-        if (!dateMap[r.date]) {
-          dateMap[r.date] = { requests: 0, prompt: 0, completion: 0, total: 0 };
-        }
+        if (!dateMap[r.date]) dateMap[r.date] = { requests: 0, prompt: 0, completion: 0 };
         dateMap[r.date].requests += r.request_count;
         dateMap[r.date].prompt += r.total_prompt_tokens;
         dateMap[r.date].completion += r.total_completion_tokens;
-        dateMap[r.date].total += r.total_tokens;
       });
 
-      // Sort dates
-      const sortedDates = Object.keys(dateMap).sort();
-      const requestCounts = sortedDates.map(d => dateMap[d].requests);
-      const promptTokens = sortedDates.map(d => dateMap[d].prompt);
-      const completionTokens = sortedDates.map(d => dateMap[d].completion);
+      const sortedDates = Object.keys(dateMap).sort().slice(-30);
+      const isEmpty = sortedDates.length === 0;
 
-      // Render request chart
-      if (requestsChartInstance) requestsChartInstance.destroy();
-      const ctx1 = document.getElementById('requests-chart').getContext('2d');
-      requestsChartInstance = new Chart(ctx1, {
-        type: 'bar',
+      document.getElementById('chart-requests-empty').classList.toggle('hidden', !isEmpty);
+      document.getElementById('chart-tokens-empty').classList.toggle('hidden', !isEmpty);
+      document.getElementById('chart-requests').classList.toggle('hidden', isEmpty);
+      document.getElementById('chart-tokens').classList.toggle('hidden', isEmpty);
+
+      if (isEmpty) return;
+
+      const labels = sortedDates;
+      const chartDefaults = {
+        borderWidth: 2, pointRadius: 3, pointHoverRadius: 5, tension: 0.4,
+        fill: true,
+      };
+      const gridColor = 'rgba(255,255,255,0.04)';
+      const tickColor = '#52525b';
+
+      // Requests chart
+      if (requestChartInstance) requestChartInstance.destroy();
+      requestChartInstance = new Chart(document.getElementById('chart-requests'), {
+        type: 'line',
         data: {
-          labels: sortedDates,
+          labels,
           datasets: [{
             label: 'Requests',
-            data: requestCounts,
-            backgroundColor: '#ffffff',
-            borderColor: '#fafafa',
-            borderWidth: 1,
-            borderRadius: 4
+            data: sortedDates.map(d => dateMap[d].requests),
+            borderColor: '#a78bfa',
+            backgroundColor: 'rgba(167,139,250,0.08)',
+            ...chartDefaults,
           }]
         },
         options: {
-          responsive: true,
-          maintainAspectRatio: false,
+          responsive: true, maintainAspectRatio: true,
+          plugins: { legend: { display: false } },
           scales: {
-            y: { grid: { color: '#27272a' }, ticks: { color: '#a1a1aa' } },
-            x: { grid: { display: false }, ticks: { color: '#a1a1aa' } }
-          },
-          plugins: {
-            legend: { display: false }
+            x: { grid: { color: gridColor }, ticks: { color: tickColor, font: { size: 10 } } },
+            y: { grid: { color: gridColor }, ticks: { color: tickColor, font: { size: 10 }, precision: 0 }, beginAtZero: true },
           }
         }
       });
 
-      // Render tokens chart
-      if (tokensChartInstance) tokensChartInstance.destroy();
-      const ctx2 = document.getElementById('tokens-chart').getContext('2d');
-      tokensChartInstance = new Chart(ctx2, {
-        type: 'line',
+      // Tokens chart
+      if (tokenChartInstance) tokenChartInstance.destroy();
+      tokenChartInstance = new Chart(document.getElementById('chart-tokens'), {
+        type: 'bar',
         data: {
-          labels: sortedDates,
+          labels,
           datasets: [
             {
-              label: 'Prompt Tokens',
-              data: promptTokens,
-              borderColor: '#3b82f6',
-              backgroundColor: 'rgba(59, 130, 246, 0.1)',
-              fill: true,
-              tension: 0.3
+              label: 'Prompt',
+              data: sortedDates.map(d => dateMap[d].prompt),
+              backgroundColor: 'rgba(96,165,250,0.6)',
+              borderRadius: 3,
             },
             {
-              label: 'Completion Tokens',
-              data: completionTokens,
-              borderColor: '#10b981',
-              backgroundColor: 'rgba(16, 185, 129, 0.1)',
-              fill: true,
-              tension: 0.3
-            }
+              label: 'Completion',
+              data: sortedDates.map(d => dateMap[d].completion),
+              backgroundColor: 'rgba(52,211,153,0.6)',
+              borderRadius: 3,
+            },
           ]
         },
         options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          scales: {
-            y: { grid: { color: '#27272a' }, ticks: { color: '#a1a1aa' } },
-            x: { grid: { display: false }, ticks: { color: '#a1a1aa' } }
-          },
+          responsive: true, maintainAspectRatio: true,
           plugins: {
-            legend: { labels: { color: '#fafafa' } }
+            legend: {
+              display: true, position: 'top',
+              labels: { color: '#71717a', font: { size: 11 }, boxWidth: 10 }
+            }
+          },
+          scales: {
+            x: { stacked: true, grid: { color: gridColor }, ticks: { color: tickColor, font: { size: 10 } } },
+            y: { stacked: true, grid: { color: gridColor }, ticks: { color: tickColor, font: { size: 10 }, precision: 0 }, beginAtZero: true },
           }
         }
       });
     }
 
-    // Client Keys Table
+    // ─── Client Keys ─────────────────────────────────────────────────────────
     async function loadClientKeys() {
       try {
         const keys = await apiFetch('/admin/client-keys');
         const tbody = document.getElementById('client-keys-table-body');
         tbody.innerHTML = '';
 
-        if (keys.length === 0) {
-          tbody.innerHTML = `<tr><td colspan="5" class="p-8 text-center text-zinc-500">No client keys configured. Generate one to get started.</td></tr>`;
+        if (!keys.length) {
+          tbody.innerHTML = `<tr><td colspan="5" class="p-10 text-center text-zinc-600 text-xs">No client keys configured. Add one to get started.</td></tr>`;
           return;
         }
 
         keys.forEach(k => {
-          const row = document.createElement('tr');
-          row.className = 'hover:bg-zinc-900/50 transition-all';
-          row.innerHTML = `
-            <td class="p-4 font-mono font-semibold text-zinc-100 flex items-center space-x-2">
-              <span class="key-text" data-raw="${k.key}">${maskKey(k.key)}</span>
-              <button onclick="revealKey(this)" class="text-zinc-500 hover:text-white"><i data-lucide="eye" class="h-3.5 w-3.5"></i></button>
+          const tr = document.createElement('tr');
+          tr.className = 'border-b border-zinc-800/50 hover:bg-zinc-800/30 transition-all';
+          tr.innerHTML = `
+            <td class="p-4">
+              <div class="flex items-center gap-1.5">
+                <span class="font-mono text-xs text-zinc-200 key-badge" data-raw="${escHtml(k.key)}">${maskKey(k.key)}</span>
+                <button onclick="toggleReveal(this)" title="Reveal" class="text-zinc-600 hover:text-zinc-300 transition-colors">
+                  <i data-lucide="eye" class="h-3.5 w-3.5"></i>
+                </button>
+                <button onclick="copyText(this.closest('td').querySelector('[data-raw]').getAttribute('data-raw'), this)" title="Copy" class="text-zinc-600 hover:text-zinc-300 transition-colors">
+                  <i data-lucide="copy" class="h-3.5 w-3.5"></i>
+                </button>
+              </div>
             </td>
-            <td class="p-4 text-zinc-300">${k.description || '<span class="text-zinc-600">-</span>'}</td>
-            <td class="p-4 text-zinc-300 font-mono">${k.rate_limit ? `${k.rate_limit} RPM` : 'Default'}</td>
-            <td class="p-4 text-zinc-400 text-xs">${k.created_at || 'Unknown'}</td>
+            <td class="p-4 text-xs text-zinc-400">${escHtml(k.description || '—')}</td>
+            <td class="p-4 text-xs text-zinc-400">${k.rate_limit ? k.rate_limit + ' req/min' : '—'}</td>
+            <td class="p-4 text-xs text-zinc-500">${formatDate(k.created_at)}</td>
             <td class="p-4 text-right">
-              <button onclick="deleteClientKey('${k.key}')" class="text-zinc-500 hover:text-red-400 font-semibold text-xs inline-flex items-center space-x-1 border border-zinc-800 hover:border-red-900/30 rounded px-2.5 py-1 bg-zinc-900 transition-all">
-                <i data-lucide="trash-2" class="h-3 w-3 mr-1"></i>
-                <span>Revoke</span>
+              <button onclick="deleteClientKey('${escHtml(k.key)}')" class="h-7 px-2.5 inline-flex items-center gap-1.5 rounded-md border border-zinc-800 bg-zinc-900 hover:border-red-900/50 hover:text-red-400 text-zinc-500 text-xs transition-all">
+                <i data-lucide="trash-2" class="h-3 w-3"></i> Revoke
               </button>
             </td>
           `;
-          tbody.appendChild(row);
+          tbody.appendChild(tr);
         });
-        initializeIcons();
-      } catch (err) {
-        console.error('Failed to load client keys', err);
-      }
+        lucide.createIcons({ nodes: [tbody] });
+      } catch { showToast('Failed to load client keys', 'error'); }
     }
 
-    // Reveal Key Toggle
-    function revealKey(btn) {
-      const span = btn.previousElementSibling;
-      const raw = span.getAttribute('data-raw');
-      if (span.innerText.includes('...')) {
-        span.innerText = raw;
-        btn.innerHTML = `<i data-lucide="eye-off" class="h-3.5 w-3.5"></i>`;
-      } else {
-        span.innerText = maskKey(raw);
-        btn.innerHTML = `<i data-lucide="eye" class="h-3.5 w-3.5"></i>`;
-      }
-      initializeIcons();
+    async function deleteClientKey(key) {
+      showConfirm(
+        `Revoke key ${maskKey(key)}? Clients using it will be blocked immediately.`,
+        async () => {
+          try {
+            await apiFetch(`/admin/client-keys/${encodeURIComponent(key)}`, { method: 'DELETE' });
+            showToast('Client key revoked');
+            loadClientKeys();
+          } catch { showToast('Failed to revoke key', 'error'); }
+        }
+      );
     }
 
-    // Downstream Keys Table
+    document.getElementById('create-client-key-btn').addEventListener('click', async () => {
+      const key   = document.getElementById('client-key-input').value.trim();
+      const desc  = document.getElementById('client-desc-input').value.trim();
+      const limit = document.getElementById('client-limit-input').value.trim();
+      try {
+        const res = await apiFetch('/admin/client-keys', {
+          method: 'POST',
+          body: JSON.stringify({
+            key: key || undefined,
+            description: desc || undefined,
+            rate_limit: limit ? parseInt(limit, 10) : undefined,
+          })
+        });
+        closeModal('add-client-key-modal');
+        document.getElementById('client-key-input').value = '';
+        document.getElementById('client-desc-input').value = '';
+        document.getElementById('client-limit-input').value = '';
+        // Show the created key modal
+        document.getElementById('created-key-value').textContent = res.key;
+        openModal('key-created-modal');
+        lucide.createIcons({ nodes: [document.getElementById('key-created-modal')] });
+        loadClientKeys();
+      } catch (err) { showToast('Failed to create key: ' + err.message, 'error'); }
+    });
+
+    // ─── Downstream Keys ──────────────────────────────────────────────────────
     async function loadDownstreamKeys() {
       try {
         const data = await apiFetch('/admin/keys');
@@ -727,192 +813,236 @@
         tbody.innerHTML = '';
 
         const keys = data.downstream_keys || [];
-        if (keys.length === 0) {
-          tbody.innerHTML = `<tr><td colspan="6" class="p-8 text-center text-zinc-500">No downstream keys configured in the rotating pool.</td></tr>`;
+        if (!keys.length) {
+          tbody.innerHTML = `<tr><td colspan="6" class="p-10 text-center text-zinc-600 text-xs">No downstream keys in the rotating pool.</td></tr>`;
           return;
         }
 
         keys.forEach(k => {
-          const statusBadge = k.healthy 
-            ? `<span class="px-2 py-0.5 text-xs font-semibold bg-emerald-500/10 text-emerald-400 rounded-full border border-emerald-500/20">Healthy</span>` 
-            : `<span class="px-2 py-0.5 text-xs font-semibold bg-amber-500/10 text-amber-400 rounded-full border border-amber-500/20 animate-pulse">Cooling Down</span>`;
+          const healthBadge = k.healthy
+            ? `<span class="px-2 py-0.5 text-[10px] font-semibold bg-emerald-500/10 text-emerald-400 rounded-full border border-emerald-500/20">Healthy</span>`
+            : `<span class="px-2 py-0.5 text-[10px] font-semibold bg-amber-500/10 text-amber-400 rounded-full border border-amber-500/20 pulse-dot">Cooling</span>`;
 
-          const row = document.createElement('tr');
-          row.className = 'hover:bg-zinc-900/50 transition-all';
-          row.innerHTML = `
-            <td class="p-4 font-mono font-semibold text-zinc-100 flex items-center space-x-2">
-              <span class="key-text" data-raw="${k.actual_key}">${k.key}</span>
-              <button onclick="revealKey(this)" class="text-zinc-500 hover:text-white"><i data-lucide="eye" class="h-3.5 w-3.5"></i></button>
+          const tr = document.createElement('tr');
+          tr.className = 'border-b border-zinc-800/50 hover:bg-zinc-800/30 transition-all';
+          tr.id = `dk-row-${btoa(k.actual_key).replace(/[^a-zA-Z0-9]/g, '')}`;
+          tr.innerHTML = `
+            <td class="p-4">
+              <div class="flex items-center gap-1.5">
+                <span class="font-mono text-xs text-zinc-200 key-badge" data-raw="${escHtml(k.actual_key)}">${escHtml(k.key)}</span>
+                <button onclick="toggleReveal(this)" title="Reveal" class="text-zinc-600 hover:text-zinc-300 transition-colors">
+                  <i data-lucide="eye" class="h-3.5 w-3.5"></i>
+                </button>
+                <button onclick="copyText(this.closest('td').querySelector('[data-raw]').getAttribute('data-raw'), this)" title="Copy" class="text-zinc-600 hover:text-zinc-300 transition-colors">
+                  <i data-lucide="copy" class="h-3.5 w-3.5"></i>
+                </button>
+              </div>
             </td>
-            <td class="p-4 text-zinc-300 font-mono">${k.weight}</td>
-            <td class="p-4">${statusBadge}</td>
-            <td class="p-4 text-zinc-300 font-mono">${k.request_count}</td>
-            <td class="p-4 text-zinc-400 font-mono">${k.consecutive_errors}</td>
+            <td class="p-4">
+              <div class="flex items-center gap-1.5" id="weight-cell-${escHtml(k.actual_key)}">
+                <span class="text-xs text-zinc-300 font-mono w-6">${k.weight}</span>
+                <button onclick="startWeightEdit('${escHtml(k.actual_key)}', ${k.weight})" class="text-zinc-600 hover:text-zinc-300 transition-colors" title="Edit weight">
+                  <i data-lucide="pencil" class="h-3 w-3"></i>
+                </button>
+              </div>
+            </td>
+            <td class="p-4">${healthBadge}</td>
+            <td class="p-4 text-xs text-zinc-400 font-mono">${(k.request_count || 0).toLocaleString()}</td>
+            <td class="p-4 text-xs text-zinc-500 font-mono">${k.consecutive_errors}</td>
             <td class="p-4 text-right">
-              <button onclick="deleteDownstreamKey('${k.actual_key}')" class="text-zinc-500 hover:text-red-400 font-semibold text-xs inline-flex items-center space-x-1 border border-zinc-800 hover:border-red-900/30 rounded px-2.5 py-1 bg-zinc-900 transition-all">
-                <i data-lucide="trash-2" class="h-3 w-3 mr-1"></i>
-                <span>Remove</span>
+              <button onclick="deleteDownstreamKey('${escHtml(k.actual_key)}')" class="h-7 px-2.5 inline-flex items-center gap-1.5 rounded-md border border-zinc-800 bg-zinc-900 hover:border-red-900/50 hover:text-red-400 text-zinc-500 text-xs transition-all">
+                <i data-lucide="trash-2" class="h-3 w-3"></i> Remove
               </button>
             </td>
           `;
-          tbody.appendChild(row);
+          tbody.appendChild(tr);
         });
-        initializeIcons();
-      } catch (err) {
-        console.error('Failed to load downstream keys', err);
-      }
+        lucide.createIcons({ nodes: [tbody] });
+      } catch { showToast('Failed to load downstream keys', 'error'); }
     }
 
-    // Logs Table
-    async function loadRequestLogs() {
-      try {
-        const model = document.getElementById('log-filter-model').value;
-        const from = document.getElementById('log-filter-date-from').value;
-        const to = document.getElementById('log-filter-date-to').value;
-
-        let query = `/admin/usage?`;
-        if (model) query += `model=${model}&`;
-        if (from) query += `from=${from}&`;
-        if (to) query += `to=${to}&`;
-
-        const usageData = await apiFetch(query);
-        const tbody = document.getElementById('logs-table-body');
-        tbody.innerHTML = '';
-
-        const records = usageData.records || [];
-        if (records.length === 0) {
-          tbody.innerHTML = `<tr><td colspan="8" class="p-8 text-center text-zinc-500">No request records found for the selected filter.</td></tr>`;
-          return;
-        }
-
-        records.forEach(r => {
-          const row = document.createElement('tr');
-          row.className = 'hover:bg-zinc-900/50 transition-all';
-          row.innerHTML = `
-            <td class="p-3.5 text-zinc-400 font-mono text-[10px]">${r.date}</td>
-            <td class="p-3.5 text-zinc-300 font-mono">${maskKey(r.client_key)}</td>
-            <td class="p-3.5"><span class="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-blue-500/10 text-blue-400 border border-blue-500/20">${r.client_key.startsWith('sk-') ? 'openai' : 'anthropic'}</span></td>
-            <td class="p-3.5 text-zinc-300 font-mono">/v1/chat/completions</td>
-            <td class="p-3.5 text-zinc-200 font-mono">${r.model || 'unknown'}</td>
-            <td class="p-3.5 font-semibold text-emerald-400">200 OK</td>
-            <td class="p-3.5 text-zinc-400 font-mono">- ms</td>
-            <td class="p-3.5 text-zinc-400 font-mono">${r.total_prompt_tokens} / ${r.total_completion_tokens} / ${r.total_tokens}</td>
-          `;
-          tbody.appendChild(row);
-        });
-      } catch (err) {
-        console.error('Failed to load request logs', err);
-      }
+    function startWeightEdit(key, currentWeight) {
+      const cell = document.getElementById(`weight-cell-${key}`);
+      if (!cell) return;
+      cell.innerHTML = `
+        <input type="number" id="weight-input-${escHtml(key)}" value="${currentWeight}" min="1" max="100"
+          class="w-14 h-6 rounded bg-zinc-800 border border-zinc-700 text-xs text-white px-1.5 focus:outline-none focus:ring-1 focus:ring-zinc-500">
+        <button onclick="saveWeightEdit('${escHtml(key)}')" class="h-6 px-2 rounded bg-zinc-700 hover:bg-zinc-600 text-[10px] text-white transition-all">Save</button>
+        <button onclick="loadDownstreamKeys()" class="h-6 px-1.5 rounded bg-zinc-800 hover:bg-zinc-700 text-[10px] text-zinc-400 transition-all">✕</button>
+      `;
+      document.getElementById(`weight-input-${key}`)?.focus();
     }
 
-    // Refresh Hooks
-    document.getElementById('refresh-overview-btn').addEventListener('click', loadOverviewData);
-    document.getElementById('refresh-logs-btn').addEventListener('click', loadRequestLogs);
-
-    // --- Key Mutations (Create / Delete) ---
-    
-    // Client Key
-    async function deleteClientKey(key) {
-      if (!confirm('Are you sure you want to revoke this Client Key? Clients using it will be blocked immediately.')) return;
+    async function saveWeightEdit(key) {
+      const input = document.getElementById(`weight-input-${key}`);
+      const weight = parseInt(input?.value ?? '1', 10);
+      if (!weight || weight < 1) { showToast('Weight must be at least 1', 'error'); return; }
       try {
-        await apiFetch(`/admin/client-keys/${encodeURIComponent(key)}`, { method: 'DELETE' });
-        loadClientKeys();
-      } catch (err) {
-        alert('Failed to revoke client key');
-      }
-    }
-
-    document.getElementById('create-client-key-btn').addEventListener('click', async () => {
-      const keyVal = document.getElementById('client-key-input').value.trim();
-      const descVal = document.getElementById('client-desc-input').value.trim();
-      const limitVal = document.getElementById('client-limit-input').value.trim();
-
-      const payload = {
-        key: keyVal || undefined, // Backend will auto-generate if empty
-        description: descVal || undefined,
-        rate_limit: limitVal ? parseInt(limitVal, 10) : undefined
-      };
-
-      try {
-        await apiFetch('/admin/client-keys', {
-          method: 'POST',
-          body: JSON.stringify(payload)
+        await apiFetch(`/admin/downstream-keys/${encodeURIComponent(key)}`, {
+          method: 'PATCH',
+          body: JSON.stringify({ weight }),
         });
-        document.getElementById('add-client-key-modal').classList.add('hidden');
-        // Reset form
-        document.getElementById('client-key-input').value = '';
-        document.getElementById('client-desc-input').value = '';
-        document.getElementById('client-limit-input').value = '';
-        loadClientKeys();
-      } catch (err) {
-        alert('Failed to generate client key: ' + err.message);
-      }
-    });
-
-    // Downstream Key
-    async function deleteDownstreamKey(key) {
-      if (!confirm('Are you sure you want to remove this Downstream Key from the rotating pool?')) return;
-      try {
-        await apiFetch(`/admin/downstream-keys/${encodeURIComponent(key)}`, { method: 'DELETE' });
+        showToast(`Weight updated to ${weight}`);
         loadDownstreamKeys();
-      } catch (err) {
-        alert('Failed to remove downstream key');
-      }
+      } catch (err) { showToast('Failed to update weight: ' + err.message, 'error'); }
+    }
+
+    async function deleteDownstreamKey(key) {
+      showConfirm(
+        `Remove downstream key ${maskKey(key)} from the pool?`,
+        async () => {
+          try {
+            await apiFetch(`/admin/downstream-keys/${encodeURIComponent(key)}`, { method: 'DELETE' });
+            showToast('Downstream key removed');
+            loadDownstreamKeys();
+          } catch { showToast('Failed to remove key', 'error'); }
+        }
+      );
     }
 
     document.getElementById('create-downstream-key-btn').addEventListener('click', async () => {
-      const keyVal = document.getElementById('downstream-key-input').value.trim();
-      const weightVal = document.getElementById('downstream-weight-input').value.trim();
-
-      if (!keyVal) {
-        alert('Please specify the API Key');
-        return;
-      }
-
-      const payload = {
-        key: keyVal,
-        weight: parseInt(weightVal, 10) || 1
-      };
-
+      const key    = document.getElementById('downstream-key-input').value.trim();
+      const weight = parseInt(document.getElementById('downstream-weight-input').value.trim(), 10) || 1;
+      if (!key) { showToast('API Key is required', 'error'); return; }
       try {
         await apiFetch('/admin/downstream-keys', {
           method: 'POST',
-          body: JSON.stringify(payload)
+          body: JSON.stringify({ key, weight }),
         });
-        document.getElementById('add-downstream-key-modal').classList.add('hidden');
-        // Reset form
+        closeModal('add-downstream-key-modal');
         document.getElementById('downstream-key-input').value = '';
         document.getElementById('downstream-weight-input').value = '1';
+        showToast('Downstream key added');
         loadDownstreamKeys();
-      } catch (err) {
-        alert('Failed to add downstream key: ' + err.message);
-      }
+      } catch (err) { showToast('Failed to add key: ' + err.message, 'error'); }
     });
 
-    // --- Modal Toggles ---
-    document.getElementById('open-add-client-key-modal').addEventListener('click', () => {
-      document.getElementById('add-client-key-modal').classList.remove('hidden');
-    });
+    // ─── Request Logs ─────────────────────────────────────────────────────────
+    async function loadRequestLogs() {
+      logsOffset = 0;
+      document.getElementById('load-more-btn').classList.add('hidden');
+      await fetchLogs(true);
+    }
 
-    document.getElementById('open-add-downstream-key-modal').addEventListener('click', () => {
-      document.getElementById('add-downstream-key-modal').classList.remove('hidden');
-    });
+    async function loadMoreLogs() {
+      logsOffset += LOGS_PAGE_SIZE;
+      await fetchLogs(false);
+    }
 
-    document.querySelectorAll('.close-modal').forEach(btn => {
-      btn.addEventListener('click', () => {
-        document.getElementById('add-client-key-modal').classList.add('hidden');
-        document.getElementById('add-downstream-key-modal').classList.add('hidden');
-      });
-    });
+    async function fetchLogs(replace) {
+      const model = document.getElementById('log-filter-model').value.trim();
+      const from  = document.getElementById('log-filter-date-from').value;
+      const to    = document.getElementById('log-filter-date-to').value;
+      const key   = document.getElementById('log-filter-key').value.trim();
 
-    // --- App Init ---
-    window.addEventListener('load', () => {
-      initializeIcons();
-      if (clientKey) {
-        hideLogin();
+      const params = new URLSearchParams({ limit: LOGS_PAGE_SIZE, offset: logsOffset });
+      if (model) params.set('model', model);
+      if (from)  params.set('from', from);
+      if (to)    params.set('to', to);
+      if (key)   params.set('key', key);
+
+      try {
+        const data = await apiFetch(`/admin/logs?${params}`);
+        const tbody = document.getElementById('logs-table-body');
+        const logs  = data.logs || [];
+
+        if (replace) tbody.innerHTML = '';
+
+        if (!logs.length && replace) {
+          tbody.innerHTML = `<tr><td colspan="9" class="p-10 text-center text-zinc-600 text-xs">No request logs match the current filters.</td></tr>`;
+          document.getElementById('load-more-btn').classList.add('hidden');
+          return;
+        }
+
+        logs.forEach(r => {
+          const tr = document.createElement('tr');
+          tr.className = 'border-b border-zinc-800/40 hover:bg-zinc-800/20 transition-all';
+          const protoBadge = r.protocol === 'anthropic'
+            ? `<span class="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-orange-500/10 text-orange-400 border border-orange-500/20 uppercase">ANTH</span>`
+            : `<span class="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-blue-500/10 text-blue-400 border border-blue-500/20 uppercase">OAI</span>`;
+          const streamBadge = r.is_stream
+            ? `<span class="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-purple-500/10 text-purple-400 border border-purple-500/20">SSE</span>`
+            : `<span class="text-zinc-700">—</span>`;
+          tr.innerHTML = `
+            <td class="p-3.5 text-zinc-400 font-mono whitespace-nowrap">${formatTimestamp(r.timestamp)}</td>
+            <td class="p-3.5">
+              <div class="flex items-center gap-1">
+                <span class="font-mono text-zinc-300 key-badge" data-raw="${escHtml(r.client_key)}">${maskKey(r.client_key)}</span>
+                <button onclick="copyText('${escHtml(r.client_key)}', this)" class="text-zinc-700 hover:text-zinc-400 transition-colors">
+                  <i data-lucide="copy" class="h-3 w-3"></i>
+                </button>
+              </div>
+            </td>
+            <td class="p-3.5">${protoBadge}</td>
+            <td class="p-3.5 text-zinc-500 font-mono max-w-[120px] truncate" title="${escHtml(r.path)}">${escHtml(r.path)}</td>
+            <td class="p-3.5 text-zinc-300 font-mono">${escHtml(r.model || '—')}</td>
+            <td class="p-3.5">${statusBadge(r.status_code)}</td>
+            <td class="p-3.5 text-zinc-400 font-mono">${r.latency_ms}ms</td>
+            <td class="p-3.5 text-zinc-500 font-mono whitespace-nowrap">${r.prompt_tokens ?? '—'}/${r.completion_tokens ?? '—'}/${r.total_tokens ?? '—'}</td>
+            <td class="p-3.5">${streamBadge}</td>
+          `;
+          tbody.appendChild(tr);
+        });
+
+        lucide.createIcons({ nodes: [tbody] });
+
+        const loadMore = document.getElementById('load-more-btn');
+        if (data.has_more) loadMore.classList.remove('hidden');
+        else loadMore.classList.add('hidden');
+      } catch { showToast('Failed to load request logs', 'error'); }
+    }
+
+    function clearLogFilters() {
+      document.getElementById('log-filter-model').value = '';
+      document.getElementById('log-filter-date-from').value = '';
+      document.getElementById('log-filter-date-to').value = '';
+      document.getElementById('log-filter-key').value = '';
+      loadRequestLogs();
+    }
+
+    // ─── Reveal Key Toggle ────────────────────────────────────────────────────
+    function toggleReveal(btn) {
+      const span = btn.closest('div').querySelector('[data-raw]');
+      if (!span) return;
+      const raw = span.getAttribute('data-raw');
+      if (span.textContent.includes('…') || span.textContent === '***') {
+        span.textContent = raw;
+        btn.innerHTML = `<i data-lucide="eye-off" class="h-3.5 w-3.5"></i>`;
       } else {
-        showLogin();
+        span.textContent = maskKey(raw);
+        btn.innerHTML = `<i data-lucide="eye" class="h-3.5 w-3.5"></i>`;
       }
+      lucide.createIcons({ nodes: [btn] });
+    }
+
+    // ─── Logout ───────────────────────────────────────────────────────────────
+    async function handleLogout() {
+      // Force the browser to forget cached Basic Auth credentials by sending
+      // a request with deliberately invalid credentials — the server returns 401
+      // which signals the browser to clear the stored credentials for this realm.
+      try {
+        await fetch(window.location.href, {
+          headers: { 'Authorization': 'Basic ' + btoa('__logout__:__logout__') }
+        });
+      } catch (_) {}
+      location.reload();
+    }
+
+    // ─── XSS Safety ──────────────────────────────────────────────────────────
+    function escHtml(str) {
+      if (!str) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    // ─── App Init ─────────────────────────────────────────────────────────────
+    window.addEventListener('load', () => {
+      lucide.createIcons();
+      switchTab('overview');
     });
   </script>
 </body>

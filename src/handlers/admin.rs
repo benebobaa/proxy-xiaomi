@@ -17,6 +17,16 @@ pub struct UsageQuery {
 }
 
 #[derive(Debug, Deserialize)]
+pub struct LogsQuery {
+    pub from: Option<String>,
+    pub to: Option<String>,
+    pub key: Option<String>,
+    pub model: Option<String>,
+    pub limit: Option<i64>,
+    pub offset: Option<i64>,
+}
+
+#[derive(Debug, Deserialize)]
 pub struct AddClientKeyPayload {
     pub key: Option<String>,
     pub description: Option<String>,
@@ -26,6 +36,11 @@ pub struct AddClientKeyPayload {
 #[derive(Debug, Deserialize)]
 pub struct AddDownstreamKeyPayload {
     pub key: String,
+    pub weight: i64,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct UpdateDownstreamKeyPayload {
     pub weight: i64,
 }
 
@@ -45,6 +60,29 @@ pub async fn get_usage(
     Ok(Json(json!({
         "period": { "from": from, "to": to },
         "records": usage,
+    })))
+}
+
+/// Raw request logs endpoint — returns individual records (not aggregated).
+pub async fn get_logs(
+    State(state): State<AppState>,
+    Query(query): Query<LogsQuery>,
+) -> Result<impl IntoResponse, AppError> {
+    let from = query.from.as_deref().unwrap_or("1970-01-01");
+    let to = query.to.as_deref().unwrap_or("9999-12-31");
+    let limit = query.limit.unwrap_or(100).min(500);
+    let offset = query.offset.unwrap_or(0);
+
+    let logs = state
+        .db
+        .query_logs(from, to, limit, offset, query.key.as_deref(), query.model.as_deref())
+        .await?;
+
+    Ok(Json(json!({
+        "logs": logs,
+        "limit": limit,
+        "offset": offset,
+        "has_more": logs.len() as i64 == limit,
     })))
 }
 
@@ -118,6 +156,21 @@ pub async fn add_downstream_key(
     state.db.add_downstream_key(&key, weight).await?;
 
     // Update dynamic pool
+    state.key_pool.add_key(key, weight as u32);
+
+    Ok(Json(json!({ "status": "success" })))
+}
+
+/// Update the weight of a downstream key without removing it from the pool.
+pub async fn update_downstream_key(
+    State(state): State<AppState>,
+    Path(key): Path<String>,
+    Json(payload): Json<UpdateDownstreamKeyPayload>,
+) -> Result<impl IntoResponse, AppError> {
+    let weight = payload.weight.max(1);
+    state.db.update_downstream_key_weight(&key, weight).await?;
+
+    // Re-register with new weight in the live pool
     state.key_pool.add_key(key, weight as u32);
 
     Ok(Json(json!({ "status": "success" })))
