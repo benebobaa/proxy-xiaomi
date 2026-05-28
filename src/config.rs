@@ -37,7 +37,7 @@ fn default_host() -> String {
 }
 
 fn default_port() -> u16 {
-    3000
+    8080
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -133,7 +133,20 @@ impl Config {
             let contents = std::fs::read_to_string(&config_path)?;
             toml::from_str(&contents)?
         } else {
-            anyhow::bail!("Config file not found: {}", config_path);
+            Config {
+                server: ServerConfig::default(),
+                downstream: DownstreamConfig {
+                    openai_base_url: "https://token-plan-sgp.xiaomimimo.com/v1".to_string(),
+                    anthropic_base_url: "https://token-plan-sgp.xiaomimimo.com/anthropic".to_string(),
+                    timeout_secs: default_timeout(),
+                    max_retries: default_max_retries(),
+                    retry_base_ms: default_retry_base_ms(),
+                },
+                client_keys: Vec::new(),
+                downstream_keys: Vec::new(),
+                rate_limit: RateLimitConfig::default(),
+                database: DatabaseConfig::default(),
+            }
         };
 
         // Env var overrides
@@ -154,6 +167,18 @@ impl Config {
         }
         if let Ok(token) = std::env::var("TURSO_AUTH_TOKEN") {
             config.database.token = token;
+        }
+        if let Ok(keys_str) = std::env::var("XIAOMI_PROXY_CLIENT_KEYS") {
+            config.client_keys = keys_str
+                .split(',')
+                .map(|s| ClientKeyConfig { key: s.trim().to_string() })
+                .collect();
+        }
+        if let Ok(keys_str) = std::env::var("XIAOMI_PROXY_DOWNSTREAM_KEYS") {
+            config.downstream_keys = keys_str
+                .split(',')
+                .map(|s| DownstreamKeyConfig { key: s.trim().to_string(), weight: 1 })
+                .collect();
         }
 
         Ok(config)

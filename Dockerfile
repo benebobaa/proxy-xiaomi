@@ -34,7 +34,7 @@ COPY --from=builder /app/target/release/xiaomi-proxy /app/xiaomi-proxy
 COPY --from=builder /app/config.toml /app/config.toml
 
 # Expose port
-EXPOSE 3000
+EXPOSE 8080
 
 # Set configuration environment variable
 ENV XIAOMI_PROXY_CONFIG=/app/config.toml
