@@ -31,7 +31,7 @@ WORKDIR /app
 
 # Copy release binary and configuration file
 COPY --from=builder /app/target/release/xiaomi-proxy /app/xiaomi-proxy
-COPY --from=builder /app/config.toml /app/config.toml
+COPY --from=builder /app/config.example.toml /app/config.toml
 
 # Expose port
 EXPOSE 8080
