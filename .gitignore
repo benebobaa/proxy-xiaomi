@@ -1,0 +1,15 @@
+# Rust build artifacts
+target/
+
+# Sensitive configuration files containing API keys
+config.toml
+
+# Local database file
+local.db
+
+# Log files
+*.log
+
+# Environment variables
+.env
+.env.*

@@ -1,0 +1,30 @@
+[server]
+host = "0.0.0.0"
+port = 3000
+
+[downstream]
+openai_base_url = "https://token-plan-sgp.xiaomimimo.com/v1"
+anthropic_base_url = "https://token-plan-sgp.xiaomimimo.com/anthropic"
+timeout_secs = 120
+max_retries = 3
+retry_base_ms = 500
+
+# Client keys — clients use these to authenticate with the proxy.
+# The proxy validates incoming requests against this list.
+[[client_keys]]
+key = "sk-your-client-key-here"
+
+# Downstream API keys — the proxy rotates through these when calling Xiaomi.
+# Each key can have a weight for load balancing.
+[[downstream_keys]]
+key = "tp-your-xiaomi-key-here"
+weight = 1
+
+[rate_limit]
+requests_per_minute = 60
+burst_size = 60
+
+[database]
+# Turso cloud database — get these from `turso db show --url <name>` and `turso db tokens create <name>`
+url = "libsql://your-db-url.turso.io"
+token = ""  # Set your TURSO_AUTH_TOKEN here or via env var
