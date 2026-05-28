@@ -1,17 +1,17 @@
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, RwLock};
 use tracing::{info, warn};
 
 use crate::config::DownstreamKeyConfig;
 
 pub struct KeyPool {
-    keys: Vec<Arc<PooledKey>>,
+    keys: RwLock<Vec<Arc<PooledKey>>>,
     state: Mutex<PoolState>,
 }
 
 struct PooledKey {
     key: String,
-    weight: u32,
+    weight: AtomicU32,
     healthy: AtomicBool,
     consecutive_errors: AtomicU32,
     request_count: AtomicU32,
@@ -24,7 +24,6 @@ struct PoolState {
 #[derive(Debug, Clone)]
 pub struct AcquiredKey {
     pub key: String,
-    pub index: usize,
 }
 
 impl KeyPool {
@@ -34,7 +33,7 @@ impl KeyPool {
             .map(|c| {
                 Arc::new(PooledKey {
                     key: c.key.clone(),
-                    weight: c.weight,
+                    weight: AtomicU32::new(c.weight),
                     healthy: AtomicBool::new(true),
                     consecutive_errors: AtomicU32::new(0),
                     request_count: AtomicU32::new(0),
@@ -43,7 +42,7 @@ impl KeyPool {
             .collect();
 
         Self {
-            keys,
+            keys: RwLock::new(keys),
             state: Mutex::new(PoolState {
                 round_robin_index: 0,
             }),
@@ -52,50 +51,53 @@ impl KeyPool {
 
     pub fn acquire_key(&self) -> Result<AcquiredKey, crate::error::AppError> {
         let mut state = self.state.lock().unwrap();
+        let keys = self.keys.read().unwrap();
 
-        let healthy_keys: Vec<(usize, &Arc<PooledKey>)> = self
-            .keys
+        let healthy_keys: Vec<&Arc<PooledKey>> = keys
             .iter()
-            .enumerate()
-            .filter(|(_, k)| k.healthy.load(Ordering::Relaxed))
+            .filter(|k| k.healthy.load(Ordering::Relaxed))
             .collect();
 
         if healthy_keys.is_empty() {
             return Err(crate::error::AppError::NoKeysAvailable);
         }
 
-        let total_weight: u32 = healthy_keys.iter().map(|(_, k)| k.weight).sum();
+        let total_weight: u32 = healthy_keys.iter().map(|k| k.weight.load(Ordering::Relaxed)).sum();
+        if total_weight == 0 {
+            return Err(crate::error::AppError::NoKeysAvailable);
+        }
+
         let index = state.round_robin_index % total_weight as usize;
         state.round_robin_index = (state.round_robin_index + 1) % total_weight as usize;
 
         let mut accumulated = 0u32;
-        for (i, key) in &healthy_keys {
-            accumulated += key.weight;
+        for key in &healthy_keys {
+            accumulated += key.weight.load(Ordering::Relaxed);
             if (accumulated as usize) > index {
                 key.request_count.fetch_add(1, Ordering::Relaxed);
                 return Ok(AcquiredKey {
                     key: key.key.clone(),
-                    index: *i,
                 });
             }
         }
 
-        let (i, key) = healthy_keys[0];
+        let key = healthy_keys[0];
         key.request_count.fetch_add(1, Ordering::Relaxed);
         Ok(AcquiredKey {
             key: key.key.clone(),
-            index: i,
         })
     }
 
     pub fn report_success(&self, acquired: &AcquiredKey) {
-        if let Some(key) = self.keys.get(acquired.index) {
+        let keys = self.keys.read().unwrap();
+        if let Some(key) = keys.iter().find(|k| k.key == acquired.key) {
             key.consecutive_errors.store(0, Ordering::Relaxed);
         }
     }
 
     pub fn report_failure(&self, acquired: &AcquiredKey) {
-        if let Some(key) = self.keys.get(acquired.index) {
+        let keys = self.keys.read().unwrap();
+        if let Some(key) = keys.iter().find(|k| k.key == acquired.key) {
             let errors = key.consecutive_errors.fetch_add(1, Ordering::Relaxed) + 1;
             if errors >= 3 {
                 key.healthy.store(false, Ordering::Relaxed);
@@ -119,23 +121,47 @@ impl KeyPool {
         }
     }
 
+    pub fn add_key(&self, key: String, weight: u32) {
+        let mut keys = self.keys.write().unwrap();
+        if let Some(existing) = keys.iter().find(|k| k.key == key) {
+            existing.weight.store(weight, Ordering::Relaxed);
+            existing.healthy.store(true, Ordering::Relaxed);
+            existing.consecutive_errors.store(0, Ordering::Relaxed);
+        } else {
+            keys.push(Arc::new(PooledKey {
+                key,
+                weight: AtomicU32::new(weight),
+                healthy: AtomicBool::new(true),
+                consecutive_errors: AtomicU32::new(0),
+                request_count: AtomicU32::new(0),
+            }));
+        }
+    }
+
+    pub fn remove_key(&self, key: &str) {
+        let mut keys = self.keys.write().unwrap();
+        keys.retain(|k| k.key != key);
+    }
+
     pub fn key_count(&self) -> usize {
-        self.keys.len()
+        let keys = self.keys.read().unwrap();
+        keys.len()
     }
 
     pub fn healthy_key_count(&self) -> usize {
-        self.keys
-            .iter()
+        let keys = self.keys.read().unwrap();
+        keys.iter()
             .filter(|k| k.healthy.load(Ordering::Relaxed))
             .count()
     }
 
     pub fn key_stats(&self) -> Vec<KeyStats> {
-        self.keys
-            .iter()
+        let keys = self.keys.read().unwrap();
+        keys.iter()
             .map(|k| KeyStats {
                 key: crate::config::Config::mask_key(&k.key),
-                weight: k.weight,
+                actual_key: k.key.clone(),
+                weight: k.weight.load(Ordering::Relaxed),
                 healthy: k.healthy.load(Ordering::Relaxed),
                 request_count: k.request_count.load(Ordering::Relaxed),
                 consecutive_errors: k.consecutive_errors.load(Ordering::Relaxed),
@@ -147,6 +173,7 @@ impl KeyPool {
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct KeyStats {
     pub key: String,
+    pub actual_key: String,
     pub weight: u32,
     pub healthy: bool,
     pub request_count: u32,

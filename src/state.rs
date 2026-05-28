@@ -11,6 +11,7 @@ pub struct AppState {
     pub key_pool: Arc<KeyPool>,
     pub rate_limiter: Arc<RateLimiter>,
     pub db: Arc<Db>,
+    pub client_keys: Arc<std::sync::RwLock<std::collections::HashSet<String>>>,
 }
 
 impl AppState {
@@ -19,12 +20,6 @@ impl AppState {
             .timeout(std::time::Duration::from_secs(config.downstream.timeout_secs))
             .pool_max_idle_per_host(20)
             .build()?;
-
-        let key_pool = Arc::new(KeyPool::new(&config.downstream_keys));
-        let rate_limiter = Arc::new(RateLimiter::new(
-            config.rate_limit.requests_per_minute,
-            config.rate_limit.burst_size,
-        ));
 
         // Ensure parent directory exists for SQLite if using local file
         let is_remote = config.database.url.starts_with("libsql://")
@@ -41,12 +36,56 @@ impl AppState {
 
         let db = Arc::new(Db::new(&config.database.url, &config.database.token).await?);
 
+        // Seed client keys in DB if empty, and load them into memory cache
+        let db_client_keys = db.get_client_keys().await.map_err(|e| anyhow::anyhow!(e))?;
+        let mut client_keys_set = std::collections::HashSet::new();
+
+        if db_client_keys.is_empty() && !config.client_keys.is_empty() {
+            for ck in &config.client_keys {
+                db.add_client_key(&ck.key, Some("Imported from config"), None)
+                    .await
+                    .map_err(|e| anyhow::anyhow!(e))?;
+                client_keys_set.insert(ck.key.clone());
+            }
+        } else {
+            for ck in db_client_keys {
+                client_keys_set.insert(ck.key);
+            }
+        }
+
+        // Seed downstream keys in DB if empty, and load them into key pool
+        let db_downstream_keys = db.get_downstream_keys().await.map_err(|e| anyhow::anyhow!(e))?;
+        let mut downstream_keys_list = Vec::new();
+
+        if db_downstream_keys.is_empty() && !config.downstream_keys.is_empty() {
+            for dk in &config.downstream_keys {
+                db.add_downstream_key(&dk.key, dk.weight as i64)
+                    .await
+                    .map_err(|e| anyhow::anyhow!(e))?;
+                downstream_keys_list.push(dk.clone());
+            }
+        } else {
+            for dk in db_downstream_keys {
+                downstream_keys_list.push(crate::config::DownstreamKeyConfig {
+                    key: dk.key,
+                    weight: dk.weight as u32,
+                });
+            }
+        }
+
+        let key_pool = Arc::new(KeyPool::new(&downstream_keys_list));
+        let rate_limiter = Arc::new(RateLimiter::new(
+            config.rate_limit.requests_per_minute,
+            config.rate_limit.burst_size,
+        ));
+
         Ok(Self {
             config,
             http_client,
             key_pool,
             rate_limiter,
             db,
+            client_keys: Arc::new(std::sync::RwLock::new(client_keys_set)),
         })
     }
 }

@@ -1,6 +1,6 @@
 use tracing::info;
 
-use crate::storage::models::UsageSummary;
+use crate::storage::models::{UsageSummary, ClientKeyModel, DownstreamKeyModel};
 use crate::storage::schema::SCHEMA;
 
 pub struct Db {
@@ -106,5 +106,72 @@ impl Db {
             });
         }
         Ok(summaries)
+    }
+
+    pub async fn get_client_keys(&self) -> Result<Vec<ClientKeyModel>, String> {
+        let stmt = self.conn.prepare("SELECT key, description, rate_limit, created_at FROM client_keys ORDER BY created_at DESC").await.map_err(|e| e.to_string())?;
+        let mut rows = stmt.query(()).await.map_err(|e| e.to_string())?;
+        let mut keys = Vec::new();
+        while let Some(row) = rows.next().await.map_err(|e| e.to_string())? {
+            keys.push(ClientKeyModel {
+                key: row.get::<String>(0).map_err(|e| e.to_string())?,
+                description: row.get::<Option<String>>(1).map_err(|e| e.to_string())?,
+                rate_limit: row.get::<Option<i64>>(2).map_err(|e| e.to_string())?,
+                created_at: row.get::<Option<String>>(3).map_err(|e| e.to_string())?,
+            });
+        }
+        Ok(keys)
+    }
+
+    pub async fn add_client_key(&self, key: &str, description: Option<&str>, rate_limit: Option<i64>) -> Result<(), String> {
+        self.conn
+            .execute(
+                "INSERT OR REPLACE INTO client_keys (key, description, rate_limit) VALUES (?1, ?2, ?3)",
+                libsql::params![key.to_string(), description.map(|s| s.to_string()), rate_limit],
+            )
+            .await
+            .map(|_| ())
+            .map_err(|e| e.to_string())
+    }
+
+    pub async fn delete_client_key(&self, key: &str) -> Result<(), String> {
+        self.conn
+            .execute("DELETE FROM client_keys WHERE key = ?1", libsql::params![key.to_string()])
+            .await
+            .map(|_| ())
+            .map_err(|e| e.to_string())
+    }
+
+    pub async fn get_downstream_keys(&self) -> Result<Vec<DownstreamKeyModel>, String> {
+        let stmt = self.conn.prepare("SELECT key, weight, created_at FROM downstream_keys ORDER BY created_at DESC").await.map_err(|e| e.to_string())?;
+        let mut rows = stmt.query(()).await.map_err(|e| e.to_string())?;
+        let mut keys = Vec::new();
+        while let Some(row) = rows.next().await.map_err(|e| e.to_string())? {
+            keys.push(DownstreamKeyModel {
+                key: row.get::<String>(0).map_err(|e| e.to_string())?,
+                weight: row.get::<i64>(1).map_err(|e| e.to_string())?,
+                created_at: row.get::<Option<String>>(2).map_err(|e| e.to_string())?,
+            });
+        }
+        Ok(keys)
+    }
+
+    pub async fn add_downstream_key(&self, key: &str, weight: i64) -> Result<(), String> {
+        self.conn
+            .execute(
+                "INSERT OR REPLACE INTO downstream_keys (key, weight) VALUES (?1, ?2)",
+                libsql::params![key.to_string(), weight],
+            )
+            .await
+            .map(|_| ())
+            .map_err(|e| e.to_string())
+    }
+
+    pub async fn delete_downstream_key(&self, key: &str) -> Result<(), String> {
+        self.conn
+            .execute("DELETE FROM downstream_keys WHERE key = ?1", libsql::params![key.to_string()])
+            .await
+            .map(|_| ())
+            .map_err(|e| e.to_string())
     }
 }

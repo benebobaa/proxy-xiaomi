@@ -18,4 +18,17 @@ CREATE TABLE IF NOT EXISTS request_logs (
 CREATE INDEX IF NOT EXISTS idx_request_logs_timestamp ON request_logs(timestamp);
 CREATE INDEX IF NOT EXISTS idx_request_logs_client_key ON request_logs(client_key);
 CREATE INDEX IF NOT EXISTS idx_request_logs_model ON request_logs(model);
+
+CREATE TABLE IF NOT EXISTS client_keys (
+    key          TEXT PRIMARY KEY,
+    description  TEXT,
+    rate_limit   INTEGER,
+    created_at   TEXT DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS downstream_keys (
+    key          TEXT PRIMARY KEY,
+    weight       INTEGER DEFAULT 1,
+    created_at   TEXT DEFAULT (datetime('now'))
+);
 ";

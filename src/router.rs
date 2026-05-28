@@ -1,7 +1,7 @@
 use axum::http::StatusCode;
 use axum::middleware;
 use axum::response::IntoResponse;
-use axum::routing::{get, post};
+use axum::routing::{get, post, delete};
 use axum::Router;
 use tower_http::cors::CorsLayer;
 use tower_http::trace::TraceLayer;
@@ -24,8 +24,13 @@ pub fn build_router(state: AppState) -> Router {
 
     // Admin routes
     let admin_routes = Router::new()
+        .route("/admin/dashboard", get(handlers::admin::dashboard))
         .route("/admin/usage", get(handlers::admin::get_usage))
-        .route("/admin/keys", get(handlers::admin::list_keys));
+        .route("/admin/keys", get(handlers::admin::list_keys))
+        .route("/admin/client-keys", get(handlers::admin::get_client_keys).post(handlers::admin::add_client_key))
+        .route("/admin/client-keys/{key}", delete(handlers::admin::delete_client_key))
+        .route("/admin/downstream-keys", post(handlers::admin::add_downstream_key))
+        .route("/admin/downstream-keys/{key}", delete(handlers::admin::delete_downstream_key));
 
     // Health check
     let health_routes = Router::new().route("/health", get(health_check));

@@ -1,0 +1,919 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Xiaomi Proxy Admin Gateway</title>
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Lucide Icons CDN -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- Chart.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+          },
+          colors: {
+            zinc: {
+              950: '#09090b',
+              900: '#18181b',
+              800: '#27272a',
+              700: '#3f3f46',
+              600: '#52525b',
+              500: '#71717a',
+              400: '#a1a1aa',
+              300: '#d4d4d8',
+              200: '#e4e4e7',
+              100: '#f4f4f5',
+              50: '#fafafa',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    body {
+      background-color: #09090b;
+      color: #fafafa;
+    }
+    .custom-scrollbar::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-track {
+      background: #18181b;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+      background: #27272a;
+      border-radius: 3px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+      background: #3f3f46;
+    }
+  </style>
+</head>
+<body class="min-h-screen font-sans flex flex-col antialiased selection:bg-zinc-800 selection:text-white">
+
+  <!-- 1. Authentication Overlay -->
+  <div id="login-container" class="fixed inset-0 z-50 flex items-center justify-center bg-zinc-950 bg-opacity-95 px-4 hidden">
+    <div class="w-full max-w-md bg-zinc-900 border border-zinc-800 rounded-xl p-6 shadow-2xl space-y-6">
+      <div class="space-y-2 text-center">
+        <div class="inline-flex h-12 w-12 items-center justify-center rounded-lg bg-zinc-800 text-white mb-2">
+          <i data-lucide="shield-check" class="h-6 w-6"></i>
+        </div>
+        <h1 class="text-2xl font-bold tracking-tight">Access Admin Console</h1>
+        <p class="text-sm text-zinc-400">Enter a valid Client API Key to authenticate and access metrics.</p>
+      </div>
+      <div class="space-y-4">
+        <div class="space-y-2">
+          <label for="admin-key-input" class="text-sm font-medium leading-none text-zinc-300">Admin Client Key</label>
+          <input type="password" id="admin-key-input" placeholder="sk-..." class="flex h-10 w-full rounded-md border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm text-white placeholder-zinc-600 focus:outline-none focus:ring-1 focus:ring-zinc-400 focus:border-transparent transition-all">
+        </div>
+        <button id="login-btn" class="inline-flex items-center justify-center rounded-md text-sm font-medium h-10 px-4 py-2 w-full bg-white text-zinc-950 hover:bg-zinc-200 transition-all font-semibold">
+          Authenticate
+        </button>
+      </div>
+      <div id="login-error" class="hidden text-sm text-red-500 bg-red-950/30 border border-red-900/50 rounded-md p-3 text-center">
+        Authentication failed. Please verify your client key.
+      </div>
+    </div>
+  </div>
+
+  <!-- 2. Main Dashboard Layout -->
+  <div id="dashboard-container" class="flex flex-1 flex-col md:flex-row hidden">
+    
+    <!-- Sidebar Navigation -->
+    <aside class="w-full md:w-64 bg-zinc-900 border-b md:border-b-0 md:border-r border-zinc-800 flex flex-col">
+      <div class="p-6 border-b border-zinc-800 flex items-center justify-between">
+        <div class="flex items-center space-x-2.5">
+          <div class="h-8 w-8 rounded-lg bg-white text-zinc-950 flex items-center justify-center font-bold text-lg">M</div>
+          <span class="font-bold tracking-wide text-zinc-100">Xiaomi Mimo Proxy</span>
+        </div>
+        <span class="px-2 py-0.5 text-[10px] font-semibold bg-emerald-500/10 text-emerald-400 rounded-full border border-emerald-500/20">Active</span>
+      </div>
+      
+      <!-- Nav Menu -->
+      <nav class="flex-1 p-4 space-y-1.5">
+        <button data-tab="overview" class="tab-btn flex items-center space-x-3 w-full px-3.5 py-2.5 text-sm font-medium rounded-lg bg-zinc-800 text-white transition-all">
+          <i data-lucide="layout-dashboard" class="h-4 w-4"></i>
+          <span>Overview</span>
+        </button>
+        <button data-tab="client-keys" class="tab-btn flex items-center space-x-3 w-full px-3.5 py-2.5 text-sm font-medium rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-800/50 transition-all">
+          <i data-lucide="key" class="h-4 w-4"></i>
+          <span>Client Keys</span>
+        </button>
+        <button data-tab="downstream-keys" class="tab-btn flex items-center space-x-3 w-full px-3.5 py-2.5 text-sm font-medium rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-800/50 transition-all">
+          <i data-lucide="shuffle" class="h-4 w-4"></i>
+          <span>Downstream Keys</span>
+        </button>
+        <button data-tab="request-logs" class="tab-btn flex items-center space-x-3 w-full px-3.5 py-2.5 text-sm font-medium rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-800/50 transition-all">
+          <i data-lucide="terminal" class="h-4 w-4"></i>
+          <span>Request Logs</span>
+        </button>
+      </nav>
+
+      <!-- Sidebar Footer / Logout -->
+      <div class="p-4 border-t border-zinc-800 space-y-3">
+        <div class="flex items-center space-x-2 px-3 py-1.5 rounded bg-zinc-950/50 border border-zinc-800/50">
+          <div class="h-2 w-2 rounded-full bg-emerald-500 animate-pulse"></div>
+          <span class="text-[11px] text-zinc-400 font-mono overflow-hidden text-ellipsis whitespace-nowrap" id="current-key-display">sk-...</span>
+        </div>
+        <button id="logout-btn" class="flex items-center space-x-2 text-xs text-zinc-400 hover:text-red-400 w-full px-3 py-1 text-left transition-all">
+          <i data-lucide="log-out" class="h-3.5 w-3.5"></i>
+          <span>Logout Console</span>
+        </button>
+      </div>
+    </aside>
+
+    <!-- Main Content Area -->
+    <main class="flex-1 flex flex-col bg-zinc-950 p-6 md:p-8 space-y-8 overflow-y-auto custom-scrollbar">
+      
+      <!-- A. Overview Tab Content -->
+      <div id="tab-overview" class="tab-content space-y-8">
+        
+        <!-- Header -->
+        <div class="flex flex-col md:flex-row justify-between items-start md:items-center space-y-4 md:space-y-0">
+          <div>
+            <h2 class="text-2xl font-bold tracking-tight text-white">System Dashboard</h2>
+            <p class="text-sm text-zinc-400">Telemetry, request distributions, and pool load performance.</p>
+          </div>
+          <button id="refresh-overview-btn" class="inline-flex items-center space-x-1.5 rounded-lg border border-zinc-800 bg-zinc-900 hover:bg-zinc-800 px-3.5 py-2 text-sm text-zinc-200 transition-all">
+            <i data-lucide="rotate-cw" class="h-4 w-4"></i>
+            <span>Refresh Data</span>
+          </button>
+        </div>
+
+        <!-- Stat Cards -->
+        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <!-- Client Keys Card -->
+          <div class="rounded-xl border border-zinc-800 bg-zinc-900 p-6 shadow-sm">
+            <div class="flex items-center justify-between space-y-0 pb-2">
+              <span class="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Client API Keys</span>
+              <i data-lucide="key" class="h-4 w-4 text-zinc-400"></i>
+            </div>
+            <div class="text-2xl font-bold mt-1 text-white" id="stat-client-keys">0</div>
+            <p class="text-[10px] text-zinc-500 mt-1">Permitted clients configured</p>
+          </div>
+          <!-- Downstream Keys Card -->
+          <div class="rounded-xl border border-zinc-800 bg-zinc-900 p-6 shadow-sm">
+            <div class="flex items-center justify-between space-y-0 pb-2">
+              <span class="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Downstream Keys</span>
+              <i data-lucide="shuffle" class="h-4 w-4 text-zinc-400"></i>
+            </div>
+            <div class="text-2xl font-bold mt-1 text-white" id="stat-downstream-keys">0 / 0</div>
+            <p class="text-[10px] text-emerald-400 mt-1" id="stat-downstream-healthy">0 healthy in rotation</p>
+          </div>
+          <!-- Requests Card -->
+          <div class="rounded-xl border border-zinc-800 bg-zinc-900 p-6 shadow-sm">
+            <div class="flex items-center justify-between space-y-0 pb-2">
+              <span class="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Total Requests</span>
+              <i data-lucide="activity" class="h-4 w-4 text-zinc-400"></i>
+            </div>
+            <div class="text-2xl font-bold mt-1 text-white" id="stat-total-requests">0</div>
+            <p class="text-[10px] text-zinc-500 mt-1">Aggregated historical count</p>
+          </div>
+          <!-- Latency Card -->
+          <div class="rounded-xl border border-zinc-800 bg-zinc-900 p-6 shadow-sm">
+            <div class="flex items-center justify-between space-y-0 pb-2">
+              <span class="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Tokens Generated</span>
+              <i data-lucide="coins" class="h-4 w-4 text-zinc-400"></i>
+            </div>
+            <div class="text-2xl font-bold mt-1 text-white" id="stat-total-tokens">0</div>
+            <p class="text-[10px] text-zinc-500 mt-1" id="stat-token-details">0 prompt / 0 comp</p>
+          </div>
+        </div>
+
+        <!-- Charts Area -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div class="rounded-xl border border-zinc-800 bg-zinc-900 p-5 space-y-4">
+            <h3 class="text-sm font-semibold text-zinc-300">Request Analytics (Last 30 Days)</h3>
+            <div class="h-64 relative flex items-center justify-center">
+              <canvas id="requests-chart"></canvas>
+            </div>
+          </div>
+          <div class="rounded-xl border border-zinc-800 bg-zinc-900 p-5 space-y-4">
+            <h3 class="text-sm font-semibold text-zinc-300">Token Consumption History</h3>
+            <div class="h-64 relative flex items-center justify-center">
+              <canvas id="tokens-chart"></canvas>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- B. Client Keys Tab Content -->
+      <div id="tab-client-keys" class="tab-content space-y-6 hidden">
+        
+        <!-- Header -->
+        <div class="flex justify-between items-center">
+          <div>
+            <h2 class="text-2xl font-bold tracking-tight text-white">Client Keys</h2>
+            <p class="text-sm text-zinc-400">Manage client identities and credentials authorized to call the proxy.</p>
+          </div>
+          <button id="open-add-client-key-modal" class="inline-flex items-center space-x-2 rounded-lg bg-white hover:bg-zinc-200 px-4 py-2 text-sm text-zinc-950 font-semibold transition-all shadow">
+            <i data-lucide="plus" class="h-4 w-4"></i>
+            <span>Generate Client Key</span>
+          </button>
+        </div>
+
+        <!-- Table Card -->
+        <div class="rounded-xl border border-zinc-800 bg-zinc-900 overflow-hidden shadow-sm">
+          <div class="overflow-x-auto custom-scrollbar">
+            <table class="w-full text-left border-collapse text-sm">
+              <thead>
+                <tr class="border-b border-zinc-800 bg-zinc-900/50 text-zinc-400 font-medium">
+                  <th class="p-4">Masked Client Key</th>
+                  <th class="p-4">Description</th>
+                  <th class="p-4">Rate Limit</th>
+                  <th class="p-4">Created At</th>
+                  <th class="p-4 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="client-keys-table-body" class="divide-y divide-zinc-800">
+                <!-- Dynamically Populated -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- C. Downstream Keys Tab Content -->
+      <div id="tab-downstream-keys" class="tab-content space-y-6 hidden">
+        
+        <!-- Header -->
+        <div class="flex justify-between items-center">
+          <div>
+            <h2 class="text-2xl font-bold tracking-tight text-white">Downstream Xiaomi Keys</h2>
+            <p class="text-sm text-zinc-400">Manage and rotate downstream API keys from Xiaomi Mimo Token Plan.</p>
+          </div>
+          <button id="open-add-downstream-key-modal" class="inline-flex items-center space-x-2 rounded-lg bg-white hover:bg-zinc-200 px-4 py-2 text-sm text-zinc-950 font-semibold transition-all shadow">
+            <i data-lucide="plus" class="h-4 w-4"></i>
+            <span>Add Downstream Key</span>
+          </button>
+        </div>
+
+        <!-- Table Card -->
+        <div class="rounded-xl border border-zinc-800 bg-zinc-900 overflow-hidden shadow-sm">
+          <div class="overflow-x-auto custom-scrollbar">
+            <table class="w-full text-left border-collapse text-sm">
+              <thead>
+                <tr class="border-b border-zinc-800 bg-zinc-900/50 text-zinc-400 font-medium">
+                  <th class="p-4">Downstream Key</th>
+                  <th class="p-4">Weight</th>
+                  <th class="p-4">Status</th>
+                  <th class="p-4">Total Requests</th>
+                  <th class="p-4">Consec. Errors</th>
+                  <th class="p-4 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="downstream-keys-table-body" class="divide-y divide-zinc-800">
+                <!-- Dynamically Populated -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- D. Request Logs Tab Content -->
+      <div id="tab-request-logs" class="tab-content space-y-6 hidden">
+        
+        <!-- Header -->
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div>
+            <h2 class="text-2xl font-bold tracking-tight text-white">Request Telemetry Logs</h2>
+            <p class="text-sm text-zinc-400">Real-time audit trails of completions and API requests.</p>
+          </div>
+          
+          <div class="flex flex-wrap items-center gap-3">
+            <select id="log-filter-model" class="h-9 px-3 rounded-md border border-zinc-850 bg-zinc-900 text-xs text-zinc-300 focus:outline-none">
+              <option value="">All Models</option>
+              <option value="mimo-v2.5">mimo-v2.5</option>
+              <option value="mimo-v2-omni">mimo-v2-omni</option>
+            </select>
+            <input type="date" id="log-filter-date-from" class="h-9 px-3 rounded-md border border-zinc-850 bg-zinc-900 text-xs text-zinc-300 focus:outline-none">
+            <input type="date" id="log-filter-date-to" class="h-9 px-3 rounded-md border border-zinc-850 bg-zinc-900 text-xs text-zinc-300 focus:outline-none">
+            <button id="refresh-logs-btn" class="inline-flex h-9 items-center justify-center rounded-md border border-zinc-800 bg-zinc-900 px-3.5 text-xs font-medium text-zinc-200 hover:bg-zinc-800 transition-all">
+              <i data-lucide="search" class="h-3.5 w-3.5 mr-1.5"></i>
+              Filter
+            </button>
+          </div>
+        </div>
+
+        <!-- Table Card -->
+        <div class="rounded-xl border border-zinc-800 bg-zinc-900 overflow-hidden shadow-sm">
+          <div class="overflow-x-auto custom-scrollbar">
+            <table class="w-full text-left border-collapse text-xs">
+              <thead>
+                <tr class="border-b border-zinc-800 bg-zinc-900/50 text-zinc-400 font-medium">
+                  <th class="p-3.5">Timestamp</th>
+                  <th class="p-3.5">Client Key</th>
+                  <th class="p-3.5">Protocol</th>
+                  <th class="p-3.5">Path</th>
+                  <th class="p-3.5">Model</th>
+                  <th class="p-3.5">Status</th>
+                  <th class="p-3.5">Latency</th>
+                  <th class="p-3.5">Tokens (P / C / T)</th>
+                </tr>
+              </thead>
+              <tbody id="logs-table-body" class="divide-y divide-zinc-800">
+                <!-- Dynamically Populated -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+
+    </main>
+  </div>
+
+  <!-- 3. Add Client Key Modal -->
+  <div id="add-client-key-modal" class="fixed inset-0 z-50 flex items-center justify-center bg-zinc-950/80 px-4 hidden">
+    <div class="w-full max-w-md bg-zinc-900 border border-zinc-800 rounded-xl p-6 shadow-2xl space-y-6">
+      <div class="flex justify-between items-start">
+        <h3 class="text-lg font-bold text-white">Generate Client Key</h3>
+        <button class="close-modal text-zinc-400 hover:text-white"><i data-lucide="x" class="h-5 w-5"></i></button>
+      </div>
+      
+      <div class="space-y-4">
+        <div class="space-y-2">
+          <label class="text-sm font-medium text-zinc-300">Custom Key (Leave blank to generate random key)</label>
+          <input type="text" id="client-key-input" placeholder="sk-..." class="flex h-10 w-full rounded-md border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm text-white focus:outline-none focus:ring-1 focus:ring-zinc-400 transition-all">
+        </div>
+        <div class="space-y-2">
+          <label class="text-sm font-medium text-zinc-300">Description</label>
+          <input type="text" id="client-desc-input" placeholder="e.g. Developer environment" class="flex h-10 w-full rounded-md border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm text-white focus:outline-none focus:ring-1 focus:ring-zinc-400 transition-all">
+        </div>
+        <div class="space-y-2">
+          <label class="text-sm font-medium text-zinc-300">Rate Limit (Requests per minute, blank = default)</label>
+          <input type="number" id="client-limit-input" placeholder="60" class="flex h-10 w-full rounded-md border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm text-white focus:outline-none focus:ring-1 focus:ring-zinc-400 transition-all">
+        </div>
+        
+        <button id="create-client-key-btn" class="inline-flex items-center justify-center rounded-md text-sm font-semibold h-10 px-4 py-2 w-full bg-white text-zinc-950 hover:bg-zinc-200 transition-all">
+          Create Key
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 4. Add Downstream Key Modal -->
+  <div id="add-downstream-key-modal" class="fixed inset-0 z-50 flex items-center justify-center bg-zinc-950/80 px-4 hidden">
+    <div class="w-full max-w-md bg-zinc-900 border border-zinc-800 rounded-xl p-6 shadow-2xl space-y-6">
+      <div class="flex justify-between items-start">
+        <h3 class="text-lg font-bold text-white">Add Downstream Key</h3>
+        <button class="close-modal text-zinc-400 hover:text-white"><i data-lucide="x" class="h-5 w-5"></i></button>
+      </div>
+      
+      <div class="space-y-4">
+        <div class="space-y-2">
+          <label class="text-sm font-medium text-zinc-300">Xiaomi Token Plan API Key</label>
+          <input type="text" id="downstream-key-input" placeholder="tp-..." class="flex h-10 w-full rounded-md border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm text-white focus:outline-none focus:ring-1 focus:ring-zinc-400 transition-all">
+        </div>
+        <div class="space-y-2">
+          <label class="text-sm font-medium text-zinc-300">Key Weight (Load-Balancing priority)</label>
+          <input type="number" id="downstream-weight-input" value="1" min="1" class="flex h-10 w-full rounded-md border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm text-white focus:outline-none focus:ring-1 focus:ring-zinc-400 transition-all">
+        </div>
+        
+        <button id="create-downstream-key-btn" class="inline-flex items-center justify-center rounded-md text-sm font-semibold h-10 px-4 py-2 w-full bg-white text-zinc-950 hover:bg-zinc-200 transition-all">
+          Add Key
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // --- Application State ---
+    let clientKey = localStorage.getItem('xiaomi_proxy_admin_key') || '';
+    let activeTab = 'overview';
+    let requestsChartInstance = null;
+    let tokensChartInstance = null;
+
+    // --- Helper UI Initializer ---
+    function initializeIcons() {
+      lucide.createIcons();
+    }
+
+    // --- Tab Switcher Logic ---
+    const tabButtons = document.querySelectorAll('.tab-btn');
+    const tabContents = document.querySelectorAll('.tab-content');
+
+    tabButtons.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const tab = btn.getAttribute('data-tab');
+        switchTab(tab);
+      });
+    });
+
+    function switchTab(tab) {
+      activeTab = tab;
+      
+      tabButtons.forEach(btn => {
+        if (btn.getAttribute('data-tab') === tab) {
+          btn.classList.add('bg-zinc-800', 'text-white');
+          btn.classList.remove('text-zinc-400', 'hover:bg-zinc-800/50');
+        } else {
+          btn.classList.remove('bg-zinc-800', 'text-white');
+          btn.classList.add('text-zinc-400', 'hover:bg-zinc-800/50');
+        }
+      });
+
+      tabContents.forEach(content => {
+        if (content.id === `tab-${tab}`) {
+          content.classList.remove('hidden');
+        } else {
+          content.classList.add('hidden');
+        }
+      });
+
+      // Load specific tab data
+      if (tab === 'overview') {
+        loadOverviewData();
+      } else if (tab === 'client-keys') {
+        loadClientKeys();
+      } else if (tab === 'downstream-keys') {
+        loadDownstreamKeys();
+      } else if (tab === 'request-logs') {
+        loadRequestLogs();
+      }
+    }
+
+    // --- Network API Requests ---
+    async function apiFetch(endpoint, options = {}) {
+      if (!clientKey) {
+        showLogin();
+        throw new Error('Unauthenticated');
+      }
+
+      const url = `${window.location.origin}${endpoint}`;
+      const headers = {
+        'Authorization': `Bearer ${clientKey}`,
+        'Content-Type': 'application/json',
+        ...options.headers
+      };
+
+      try {
+        const response = await fetch(url, { ...options, headers });
+        if (response.status === 401) {
+          localStorage.removeItem('xiaomi_proxy_admin_key');
+          clientKey = '';
+          showLogin();
+          throw new Error('Unauthorized');
+        }
+        if (!response.ok) {
+          const body = await response.text();
+          throw new Error(body || 'Server returned non-ok status');
+        }
+        return await response.json();
+      } catch (err) {
+        console.error(`API Error on ${endpoint}:`, err);
+        throw err;
+      }
+    }
+
+    // --- Authentication ---
+    function showLogin() {
+      document.getElementById('login-container').classList.remove('hidden');
+      document.getElementById('dashboard-container').classList.add('hidden');
+    }
+
+    function hideLogin() {
+      document.getElementById('login-container').classList.add('hidden');
+      document.getElementById('dashboard-container').classList.remove('hidden');
+      document.getElementById('current-key-display').innerText = maskKey(clientKey);
+      switchTab(activeTab);
+    }
+
+    async function attemptAuth() {
+      const inputVal = document.getElementById('admin-key-input').value.trim();
+      if (!inputVal) return;
+
+      document.getElementById('login-btn').innerText = 'Authenticating...';
+      document.getElementById('login-error').classList.add('hidden');
+
+      try {
+        // Validate by hitting the health check endpoint
+        const response = await fetch(`${window.location.origin}/health`, {
+          headers: { 'Authorization': `Bearer ${inputVal}` }
+        });
+
+        if (response.ok) {
+          clientKey = inputVal;
+          localStorage.setItem('xiaomi_proxy_admin_key', clientKey);
+          hideLogin();
+        } else {
+          document.getElementById('login-error').classList.remove('hidden');
+        }
+      } catch (err) {
+        document.getElementById('login-error').classList.remove('hidden');
+      } finally {
+        document.getElementById('login-btn').innerText = 'Authenticate';
+      }
+    }
+
+    document.getElementById('login-btn').addEventListener('click', attemptAuth);
+    document.getElementById('admin-key-input').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') attemptAuth();
+    });
+
+    document.getElementById('logout-btn').addEventListener('click', () => {
+      localStorage.removeItem('xiaomi_proxy_admin_key');
+      clientKey = '';
+      showLogin();
+    });
+
+    // --- Helper Formats ---
+    function maskKey(key) {
+      if (key.length <= 8) return '***';
+      return `${key.slice(0, 4)}...${key.slice(-4)}`;
+    }
+
+    // --- Tab Data Loaders ---
+    
+    // Overview Data
+    async function loadOverviewData() {
+      try {
+        const usageData = await apiFetch('/admin/usage');
+        const keysData = await apiFetch('/admin/keys');
+        const clientKeysData = await apiFetch('/admin/client-keys');
+
+        // Render counters
+        document.getElementById('stat-client-keys').innerText = clientKeysData.length;
+        document.getElementById('stat-downstream-keys').innerText = `${keysData.healthy} / ${keysData.total}`;
+        document.getElementById('stat-downstream-healthy').innerText = `${keysData.healthy} healthy, ${keysData.total - keysData.healthy} cooled down`;
+
+        let totalRequests = 0;
+        let totalTokens = 0;
+        let totalPromptTokens = 0;
+        let totalCompletionTokens = 0;
+
+        const records = usageData.records || [];
+        records.forEach(r => {
+          totalRequests += r.request_count;
+          totalTokens += r.total_tokens;
+          totalPromptTokens += r.total_prompt_tokens;
+          totalCompletionTokens += r.total_completion_tokens;
+        });
+
+        document.getElementById('stat-total-requests').innerText = totalRequests.toLocaleString();
+        document.getElementById('stat-total-tokens').innerText = totalTokens.toLocaleString();
+        document.getElementById('stat-token-details').innerText = `${totalPromptTokens.toLocaleString()} prompt / ${totalCompletionTokens.toLocaleString()} comp`;
+
+        // Render Charts
+        renderOverviewCharts(records);
+
+      } catch (err) {
+        console.error('Failed to load overview data', err);
+      }
+    }
+
+    function renderOverviewCharts(records) {
+      // Group records by date
+      const dateMap = {};
+      
+      records.forEach(r => {
+        if (!dateMap[r.date]) {
+          dateMap[r.date] = { requests: 0, prompt: 0, completion: 0, total: 0 };
+        }
+        dateMap[r.date].requests += r.request_count;
+        dateMap[r.date].prompt += r.total_prompt_tokens;
+        dateMap[r.date].completion += r.total_completion_tokens;
+        dateMap[r.date].total += r.total_tokens;
+      });
+
+      // Sort dates
+      const sortedDates = Object.keys(dateMap).sort();
+      const requestCounts = sortedDates.map(d => dateMap[d].requests);
+      const promptTokens = sortedDates.map(d => dateMap[d].prompt);
+      const completionTokens = sortedDates.map(d => dateMap[d].completion);
+
+      // Render request chart
+      if (requestsChartInstance) requestsChartInstance.destroy();
+      const ctx1 = document.getElementById('requests-chart').getContext('2d');
+      requestsChartInstance = new Chart(ctx1, {
+        type: 'bar',
+        data: {
+          labels: sortedDates,
+          datasets: [{
+            label: 'Requests',
+            data: requestCounts,
+            backgroundColor: '#ffffff',
+            borderColor: '#fafafa',
+            borderWidth: 1,
+            borderRadius: 4
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            y: { grid: { color: '#27272a' }, ticks: { color: '#a1a1aa' } },
+            x: { grid: { display: false }, ticks: { color: '#a1a1aa' } }
+          },
+          plugins: {
+            legend: { display: false }
+          }
+        }
+      });
+
+      // Render tokens chart
+      if (tokensChartInstance) tokensChartInstance.destroy();
+      const ctx2 = document.getElementById('tokens-chart').getContext('2d');
+      tokensChartInstance = new Chart(ctx2, {
+        type: 'line',
+        data: {
+          labels: sortedDates,
+          datasets: [
+            {
+              label: 'Prompt Tokens',
+              data: promptTokens,
+              borderColor: '#3b82f6',
+              backgroundColor: 'rgba(59, 130, 246, 0.1)',
+              fill: true,
+              tension: 0.3
+            },
+            {
+              label: 'Completion Tokens',
+              data: completionTokens,
+              borderColor: '#10b981',
+              backgroundColor: 'rgba(16, 185, 129, 0.1)',
+              fill: true,
+              tension: 0.3
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            y: { grid: { color: '#27272a' }, ticks: { color: '#a1a1aa' } },
+            x: { grid: { display: false }, ticks: { color: '#a1a1aa' } }
+          },
+          plugins: {
+            legend: { labels: { color: '#fafafa' } }
+          }
+        }
+      });
+    }
+
+    // Client Keys Table
+    async function loadClientKeys() {
+      try {
+        const keys = await apiFetch('/admin/client-keys');
+        const tbody = document.getElementById('client-keys-table-body');
+        tbody.innerHTML = '';
+
+        if (keys.length === 0) {
+          tbody.innerHTML = `<tr><td colspan="5" class="p-8 text-center text-zinc-500">No client keys configured. Generate one to get started.</td></tr>`;
+          return;
+        }
+
+        keys.forEach(k => {
+          const row = document.createElement('tr');
+          row.className = 'hover:bg-zinc-900/50 transition-all';
+          row.innerHTML = `
+            <td class="p-4 font-mono font-semibold text-zinc-100 flex items-center space-x-2">
+              <span class="key-text" data-raw="${k.key}">${maskKey(k.key)}</span>
+              <button onclick="revealKey(this)" class="text-zinc-500 hover:text-white"><i data-lucide="eye" class="h-3.5 w-3.5"></i></button>
+            </td>
+            <td class="p-4 text-zinc-300">${k.description || '<span class="text-zinc-600">-</span>'}</td>
+            <td class="p-4 text-zinc-300 font-mono">${k.rate_limit ? `${k.rate_limit} RPM` : 'Default'}</td>
+            <td class="p-4 text-zinc-400 text-xs">${k.created_at || 'Unknown'}</td>
+            <td class="p-4 text-right">
+              <button onclick="deleteClientKey('${k.key}')" class="text-zinc-500 hover:text-red-400 font-semibold text-xs inline-flex items-center space-x-1 border border-zinc-800 hover:border-red-900/30 rounded px-2.5 py-1 bg-zinc-900 transition-all">
+                <i data-lucide="trash-2" class="h-3 w-3 mr-1"></i>
+                <span>Revoke</span>
+              </button>
+            </td>
+          `;
+          tbody.appendChild(row);
+        });
+        initializeIcons();
+      } catch (err) {
+        console.error('Failed to load client keys', err);
+      }
+    }
+
+    // Reveal Key Toggle
+    function revealKey(btn) {
+      const span = btn.previousElementSibling;
+      const raw = span.getAttribute('data-raw');
+      if (span.innerText.includes('...')) {
+        span.innerText = raw;
+        btn.innerHTML = `<i data-lucide="eye-off" class="h-3.5 w-3.5"></i>`;
+      } else {
+        span.innerText = maskKey(raw);
+        btn.innerHTML = `<i data-lucide="eye" class="h-3.5 w-3.5"></i>`;
+      }
+      initializeIcons();
+    }
+
+    // Downstream Keys Table
+    async function loadDownstreamKeys() {
+      try {
+        const data = await apiFetch('/admin/keys');
+        const tbody = document.getElementById('downstream-keys-table-body');
+        tbody.innerHTML = '';
+
+        const keys = data.downstream_keys || [];
+        if (keys.length === 0) {
+          tbody.innerHTML = `<tr><td colspan="6" class="p-8 text-center text-zinc-500">No downstream keys configured in the rotating pool.</td></tr>`;
+          return;
+        }
+
+        keys.forEach(k => {
+          const statusBadge = k.healthy 
+            ? `<span class="px-2 py-0.5 text-xs font-semibold bg-emerald-500/10 text-emerald-400 rounded-full border border-emerald-500/20">Healthy</span>` 
+            : `<span class="px-2 py-0.5 text-xs font-semibold bg-amber-500/10 text-amber-400 rounded-full border border-amber-500/20 animate-pulse">Cooling Down</span>`;
+
+          const row = document.createElement('tr');
+          row.className = 'hover:bg-zinc-900/50 transition-all';
+          row.innerHTML = `
+            <td class="p-4 font-mono font-semibold text-zinc-100 flex items-center space-x-2">
+              <span class="key-text" data-raw="${k.actual_key}">${k.key}</span>
+              <button onclick="revealKey(this)" class="text-zinc-500 hover:text-white"><i data-lucide="eye" class="h-3.5 w-3.5"></i></button>
+            </td>
+            <td class="p-4 text-zinc-300 font-mono">${k.weight}</td>
+            <td class="p-4">${statusBadge}</td>
+            <td class="p-4 text-zinc-300 font-mono">${k.request_count}</td>
+            <td class="p-4 text-zinc-400 font-mono">${k.consecutive_errors}</td>
+            <td class="p-4 text-right">
+              <button onclick="deleteDownstreamKey('${k.actual_key}')" class="text-zinc-500 hover:text-red-400 font-semibold text-xs inline-flex items-center space-x-1 border border-zinc-800 hover:border-red-900/30 rounded px-2.5 py-1 bg-zinc-900 transition-all">
+                <i data-lucide="trash-2" class="h-3 w-3 mr-1"></i>
+                <span>Remove</span>
+              </button>
+            </td>
+          `;
+          tbody.appendChild(row);
+        });
+        initializeIcons();
+      } catch (err) {
+        console.error('Failed to load downstream keys', err);
+      }
+    }
+
+    // Logs Table
+    async function loadRequestLogs() {
+      try {
+        const model = document.getElementById('log-filter-model').value;
+        const from = document.getElementById('log-filter-date-from').value;
+        const to = document.getElementById('log-filter-date-to').value;
+
+        let query = `/admin/usage?`;
+        if (model) query += `model=${model}&`;
+        if (from) query += `from=${from}&`;
+        if (to) query += `to=${to}&`;
+
+        const usageData = await apiFetch(query);
+        const tbody = document.getElementById('logs-table-body');
+        tbody.innerHTML = '';
+
+        const records = usageData.records || [];
+        if (records.length === 0) {
+          tbody.innerHTML = `<tr><td colspan="8" class="p-8 text-center text-zinc-500">No request records found for the selected filter.</td></tr>`;
+          return;
+        }
+
+        records.forEach(r => {
+          const row = document.createElement('tr');
+          row.className = 'hover:bg-zinc-900/50 transition-all';
+          row.innerHTML = `
+            <td class="p-3.5 text-zinc-400 font-mono text-[10px]">${r.date}</td>
+            <td class="p-3.5 text-zinc-300 font-mono">${maskKey(r.client_key)}</td>
+            <td class="p-3.5"><span class="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-blue-500/10 text-blue-400 border border-blue-500/20">${r.client_key.startsWith('sk-') ? 'openai' : 'anthropic'}</span></td>
+            <td class="p-3.5 text-zinc-300 font-mono">/v1/chat/completions</td>
+            <td class="p-3.5 text-zinc-200 font-mono">${r.model || 'unknown'}</td>
+            <td class="p-3.5 font-semibold text-emerald-400">200 OK</td>
+            <td class="p-3.5 text-zinc-400 font-mono">- ms</td>
+            <td class="p-3.5 text-zinc-400 font-mono">${r.total_prompt_tokens} / ${r.total_completion_tokens} / ${r.total_tokens}</td>
+          `;
+          tbody.appendChild(row);
+        });
+      } catch (err) {
+        console.error('Failed to load request logs', err);
+      }
+    }
+
+    // Refresh Hooks
+    document.getElementById('refresh-overview-btn').addEventListener('click', loadOverviewData);
+    document.getElementById('refresh-logs-btn').addEventListener('click', loadRequestLogs);
+
+    // --- Key Mutations (Create / Delete) ---
+    
+    // Client Key
+    async function deleteClientKey(key) {
+      if (!confirm('Are you sure you want to revoke this Client Key? Clients using it will be blocked immediately.')) return;
+      try {
+        await apiFetch(`/admin/client-keys/${encodeURIComponent(key)}`, { method: 'DELETE' });
+        loadClientKeys();
+      } catch (err) {
+        alert('Failed to revoke client key');
+      }
+    }
+
+    document.getElementById('create-client-key-btn').addEventListener('click', async () => {
+      const keyVal = document.getElementById('client-key-input').value.trim();
+      const descVal = document.getElementById('client-desc-input').value.trim();
+      const limitVal = document.getElementById('client-limit-input').value.trim();
+
+      const payload = {
+        key: keyVal || undefined, // Backend will auto-generate if empty
+        description: descVal || undefined,
+        rate_limit: limitVal ? parseInt(limitVal, 10) : undefined
+      };
+
+      try {
+        await apiFetch('/admin/client-keys', {
+          method: 'POST',
+          body: JSON.stringify(payload)
+        });
+        document.getElementById('add-client-key-modal').classList.add('hidden');
+        // Reset form
+        document.getElementById('client-key-input').value = '';
+        document.getElementById('client-desc-input').value = '';
+        document.getElementById('client-limit-input').value = '';
+        loadClientKeys();
+      } catch (err) {
+        alert('Failed to generate client key: ' + err.message);
+      }
+    });
+
+    // Downstream Key
+    async function deleteDownstreamKey(key) {
+      if (!confirm('Are you sure you want to remove this Downstream Key from the rotating pool?')) return;
+      try {
+        await apiFetch(`/admin/downstream-keys/${encodeURIComponent(key)}`, { method: 'DELETE' });
+        loadDownstreamKeys();
+      } catch (err) {
+        alert('Failed to remove downstream key');
+      }
+    }
+
+    document.getElementById('create-downstream-key-btn').addEventListener('click', async () => {
+      const keyVal = document.getElementById('downstream-key-input').value.trim();
+      const weightVal = document.getElementById('downstream-weight-input').value.trim();
+
+      if (!keyVal) {
+        alert('Please specify the API Key');
+        return;
+      }
+
+      const payload = {
+        key: keyVal,
+        weight: parseInt(weightVal, 10) || 1
+      };
+
+      try {
+        await apiFetch('/admin/downstream-keys', {
+          method: 'POST',
+          body: JSON.stringify(payload)
+        });
+        document.getElementById('add-downstream-key-modal').classList.add('hidden');
+        // Reset form
+        document.getElementById('downstream-key-input').value = '';
+        document.getElementById('downstream-weight-input').value = '1';
+        loadDownstreamKeys();
+      } catch (err) {
+        alert('Failed to add downstream key: ' + err.message);
+      }
+    });
+
+    // --- Modal Toggles ---
+    document.getElementById('open-add-client-key-modal').addEventListener('click', () => {
+      document.getElementById('add-client-key-modal').classList.remove('hidden');
+    });
+
+    document.getElementById('open-add-downstream-key-modal').addEventListener('click', () => {
+      document.getElementById('add-downstream-key-modal').classList.remove('hidden');
+    });
+
+    document.querySelectorAll('.close-modal').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.getElementById('add-client-key-modal').classList.add('hidden');
+        document.getElementById('add-downstream-key-modal').classList.add('hidden');
+      });
+    });
+
+    // --- App Init ---
+    window.addEventListener('load', () => {
+      initializeIcons();
+      if (clientKey) {
+        hideLogin();
+      } else {
+        showLogin();
+      }
+    });
+  </script>
+</body>
+</html>

@@ -35,7 +35,7 @@ pub async fn auth(
     };
 
     match key {
-        Some(k) if state.config.is_valid_client_key(&k) => {
+        Some(k) if state.client_keys.read().unwrap().contains(&k) => {
             debug!(client_key = %Config::mask_key(&k), "Authenticated request");
             req.extensions_mut().insert(ClientKey(k));
             Ok(next.run(req).await)

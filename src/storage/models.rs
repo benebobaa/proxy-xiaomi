@@ -27,3 +27,18 @@ pub struct UsageSummary {
     pub total_completion_tokens: i64,
     pub total_tokens: i64,
 }
+
+#[derive(Debug, Clone, Serialize, serde::Deserialize)]
+pub struct ClientKeyModel {
+    pub key: String,
+    pub description: Option<String>,
+    pub rate_limit: Option<i64>,
+    pub created_at: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, serde::Deserialize)]
+pub struct DownstreamKeyModel {
+    pub key: String,
+    pub weight: i64,
+    pub created_at: Option<String>,
+}
