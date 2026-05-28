@@ -13,6 +13,29 @@ pub struct Config {
     pub rate_limit: RateLimitConfig,
     #[serde(default)]
     pub database: DatabaseConfig,
+    #[serde(default)]
+    pub admin: AdminConfig,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct AdminConfig {
+    /// HTTP Basic Auth username for the /admin/* console.
+    /// Set via XIAOMI_PROXY_ADMIN_USERNAME env var.
+    #[serde(default)]
+    pub username: String,
+    /// HTTP Basic Auth password for the /admin/* console.
+    /// Set via XIAOMI_PROXY_ADMIN_PASSWORD env var.
+    #[serde(default)]
+    pub password: String,
+}
+
+impl Default for AdminConfig {
+    fn default() -> Self {
+        Self {
+            username: String::new(),
+            password: String::new(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -146,6 +169,7 @@ impl Config {
                 downstream_keys: Vec::new(),
                 rate_limit: RateLimitConfig::default(),
                 database: DatabaseConfig::default(),
+                admin: AdminConfig::default(),
             }
         };
 
@@ -179,6 +203,12 @@ impl Config {
                 .split(',')
                 .map(|s| DownstreamKeyConfig { key: s.trim().to_string(), weight: 1 })
                 .collect();
+        }
+        if let Ok(username) = std::env::var("XIAOMI_PROXY_ADMIN_USERNAME") {
+            config.admin.username = username;
+        }
+        if let Ok(password) = std::env::var("XIAOMI_PROXY_ADMIN_PASSWORD") {
+            config.admin.password = password;
         }
 
         Ok(config)
